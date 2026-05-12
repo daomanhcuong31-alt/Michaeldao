@@ -1,0 +1,259 @@
+"""
+main.py - SF Agentic AI System entry point
+"""
+
+import argparse
+import json
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+
+console = Console()
+
+SAMPLE_TERM_SHEET = """
+TERM SHEET - INDICATIVE (NOT BINDING)
+Date: April 2026
+
+Borrower: Viet Nam Industrial Development Corporation (VIDC)
+Borrower Type: State-Owned Enterprise (100% Government Owned)
+Facility Type: Syndicated Term Loan
+Amount: USD 25,000,000 (Twenty-Five Million US Dollars)
+Currency: USD
+Tenor: 5 years from first drawdown
+Pricing: SOFR + 3.50% per annum
+Pricing Basis: Floating rate, reset quarterly
+Purpose: Acquisition of industrial machinery and equipment for expansion
+Repayment: Semi-annual equal principal instalments
+Security: First-ranking mortgage over industrial land use rights
+Covenants:
+  - DSCR minimum 1.20x
+  - Leverage ratio maximum 3.5x Net Debt / EBITDA
+Conditions Precedent:
+  - Legal opinions from Vietnamese and international counsel
+Governing Law: Vietnamese Law
+Accounting Standard: IFRS
+"""
+
+
+def process_deal(input_text: str = None, file_paths=None):
+    file_paths = file_paths or []
+
+    console.print("\n[bold]Step 1/6:[/bold] Checking LM Studio connection...")
+    from config import verify_connection, settings
+    if not verify_connection():
+        console.print("[red]x LM Studio is not responding.[/red]")
+        sys.exit(1)
+    console.print(f"[green]OK LM Studio connected ({settings.model})[/green]")
+
+    if file_paths and not input_text:
+        from tools.ocr import extract_text_from_files
+        console.print(f"\n[bold]Step 2/6:[/bold] Extracting text from {len(file_paths)} file(s)...")
+        ext = extract_text_from_files(file_paths)
+        input_text = ext["text"]
+        for w in ext.get("warnings", []):
+            console.print(f"  [yellow]Warning: {w}[/yellow]")
+        if not input_text.strip():
+            console.print("[red]x Could not extract text from provided files.[/red]")
+            sys.exit(1)
+        console.print(f"[green]OK Extracted {len(input_text)} characters from {ext['count']} file(s)[/green]")
+    else:
+        input_text = input_text or ""
+        console.print(f"\n[bold]Step 2/6:[/bold] Using provided text ({len(input_text)} chars) OK")
+
+    console.print("\n[bold]Step 3/6:[/bold] Running agent pipeline...")
+    from workflow.graph import run_pipeline
+    final_state = run_pipeline(input_text=input_text, file_path=";".join(file_paths) if file_paths else None)
+
+    console.print("\n[bold]Step 4/6:[/bold] Pipeline complete. Summary:")
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Agent", style="cyan")
+    table.add_column("Status")
+    table.add_column("Notes")
+
+    agents = ["ingestion", "market_intel", "analysis_parallel", "financial_modeler", "compliance", "memo_architect", "senior_advisor"]
+    labels = {
+        "ingestion": "Ingestion",
+        "market_intel": "Market Intelligence",
+        "analysis_parallel": "Parallel Analysis",
+        "financial_modeler": "Financial Modeler",
+        "compliance": "Compliance and Risk",
+        "memo_architect": "Memo Architect",
+        "senior_advisor": "Senior Advisor",
+    }
+
+    for a in agents:
+        done = a in final_state.completed_steps
+        errs = [e for e in final_state.errors if e.get("agent") == a]
+        note = errs[0]["error"][:80] if errs else "-"
+        table.add_row(labels[a], "[green]OK Complete[/green]" if done else "[red]x Incomplete[/red]", note)
+
+    console.print(table)
+    console.print(
+        f"\n[bold]Senior Advisor Decision:[/bold] "
+        f"{getattr(final_state, 'quality_gate_decision', 'N/A')} "
+        f"(score: {getattr(final_state, 'quality_score', 'N/A')})"
+    )
+
+    console.print("\n[bold]Step 5/6:[/bold] Saving credit memo...")
+    output_dir = Path("./data/output")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    borrower = (final_state.parsed_terms or {}).get("borrower", "unknown")
+    safe_name = "".join(c for c in borrower if c.isalnum() or c in " _-")[:30].strip() or "unknown"
+    output_file = output_dir / f"CC_Memo_{safe_name}_{timestamp}.txt"
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(final_state.draft_memo or "")
+
+    console.print(f"[green]OK Memo saved: {output_file}[/green]")
+
+    console.print("\n[bold]Step 6/6:[/bold] Credit Committee Memo:\n")
+    console.print(
+        Panel(
+            final_state.draft_memo or "[EMPTY OUTPUT]",
+            title="[bold cyan]DRAFT CREDIT COMMITTEE MEMORANDUM[/bold cyan]",
+            border_style="cyan",
+            expand=False,
+        )
+    )
+    return final_state
+
+
+def _prompt_post_credit_mode() -> str:
+    console.print("\n[bold]Post-Credit Stage:[/bold] choose next action")
+    console.print("  [bold]1.[/bold] Stop after memo (human review only)")
+    console.print("  [bold]2.[/bold] Holdbook execution plan only")
+    console.print("  [bold]3.[/bold] Distribution advisory + operations plan")
+    console.print("  [bold]4.[/bold] Hybrid (partial distribution + holdbook)")
+    choice = input("Choose (1/2/3/4): ").strip()
+    return {"1": "stop", "2": "holdbook", "3": "distribution", "4": "hybrid"}.get(choice, "stop")
+
+
+def run_post_credit_stage(final_state, requested_mode: str = "ask", no_web_research: bool = False):
+    mode = (requested_mode or "ask").strip().lower()
+    if mode == "ask":
+        mode = _prompt_post_credit_mode()
+
+    if mode == "stop":
+        console.print("\n[dim]Post-credit stage skipped by user.[/dim]")
+        return
+
+    if getattr(final_state, "quality_gate_decision", "") == "ESCALATE_TO_HUMAN":
+        confirm = input("Memo is escalated for human review. Continue to post-credit planning anyway? (y/N): ").strip().lower()
+        if confirm not in {"y", "yes"}:
+            console.print("[dim]Post-credit stage cancelled.[/dim]")
+            return
+
+    from workflow.post_credit import run_post_credit_workflow, render_post_credit_report
+
+    console.print("\n[bold]Step 7:[/bold] Running post-credit execution stage...")
+    bundle = run_post_credit_workflow(
+        final_state,
+        mode=mode.upper(),
+        run_web_research=(not no_web_research),
+    )
+
+    output_dir = Path("./data/output")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    borrower = (final_state.parsed_terms or {}).get("borrower", "unknown")
+    safe_name = "".join(c for c in borrower if c.isalnum() or c in " _-")[:30].strip() or "unknown"
+
+    json_file = output_dir / f"PostCredit_{safe_name}_{timestamp}.json"
+    md_file = output_dir / f"PostCredit_{safe_name}_{timestamp}.md"
+
+    with open(json_file, "w", encoding="utf-8") as f:
+        json.dump(bundle, f, indent=2, ensure_ascii=False)
+
+    report = render_post_credit_report(bundle)
+    with open(md_file, "w", encoding="utf-8") as f:
+        f.write(report)
+
+    console.print(f"[green]OK Post-credit JSON saved: {json_file}[/green]")
+    console.print(f"[green]OK Post-credit report saved: {md_file}[/green]")
+
+    advice = bundle.get("distribution_advice", {}) if isinstance(bundle, dict) else {}
+    rec = advice.get("distribution_recommendation", "N/A")
+    conf = advice.get("confidence", "N/A")
+    console.print(f"[bold]Distribution recommendation:[/bold] {rec} (confidence: {conf})")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="SF Agentic AI - Automated Credit Memo + Post-Credit Planning")
+    parser.add_argument("--text", type=str, help="Term sheet text")
+    parser.add_argument("--file", type=str, help="Single file path")
+    parser.add_argument("--files", nargs="+", help="Multiple file paths")
+    parser.add_argument("--sample", action="store_true", help="Run with sample deal")
+    parser.add_argument("--post-credit", choices=["ask", "stop", "holdbook", "distribution", "hybrid"], default="ask")
+    parser.add_argument("--no-web-research", action="store_true", help="Disable Perplexity web research in post-credit stage")
+    args = parser.parse_args()
+
+    console.print(
+        Panel.fit(
+            "[bold cyan]SF Agentic AI System[/bold cyan]\n"
+            "[dim]Structured Finance - Local LLM via LM Studio[/dim]",
+            border_style="cyan",
+        )
+    )
+
+    final_state = None
+
+    if args.sample:
+        final_state = process_deal(input_text=SAMPLE_TERM_SHEET)
+    elif args.text:
+        final_state = process_deal(input_text=args.text)
+    elif args.files:
+        bad = [f for f in args.files if not os.path.exists(f)]
+        if bad:
+            console.print(f"[red]Missing file(s): {bad}[/red]")
+            sys.exit(1)
+        final_state = process_deal(file_paths=args.files)
+    elif args.file:
+        if not os.path.exists(args.file):
+            console.print(f"[red]File not found: {args.file}[/red]")
+            sys.exit(1)
+        final_state = process_deal(file_paths=[args.file])
+    else:
+        console.print("\nNo input provided. Options:\n")
+        console.print("  [bold]1.[/bold] Run sample")
+        console.print("  [bold]2.[/bold] Paste text")
+        console.print("  [bold]3.[/bold] Provide file path(s)")
+        console.print("  [bold]4.[/bold] Exit\n")
+        choice = input("Choose (1/2/3/4): ").strip()
+
+        if choice == "1":
+            final_state = process_deal(input_text=SAMPLE_TERM_SHEET)
+        elif choice == "2":
+            console.print("\nPaste text then type END on a new line:\n")
+            lines = []
+            while True:
+                line = input()
+                if line.strip() == "END":
+                    break
+                lines.append(line)
+            final_state = process_deal(input_text="\n".join(lines))
+        elif choice == "3":
+            raw = input("Enter one or more file paths separated by comma: ").strip()
+            paths = [p.strip() for p in raw.split(",") if p.strip()]
+            bad = [f for f in paths if not os.path.exists(f)]
+            if bad:
+                console.print(f"[red]Missing file(s): {bad}[/red]")
+                sys.exit(1)
+            final_state = process_deal(file_paths=paths)
+        else:
+            sys.exit(0)
+
+    if final_state is not None:
+        run_post_credit_stage(
+            final_state,
+            requested_mode=args.post_credit,
+            no_web_research=args.no_web_research,
+        )
+
+
+if __name__ == "__main__":
+    main()

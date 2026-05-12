@@ -1,0 +1,92 @@
+"""
+Memo Architect with brand + audience controls and advisor-driven rewrite support.
+"""
+
+import json
+from agents.base import BaseAgent
+from workflow.state import DealState
+from prompts.tcb_tone import TCB_TONE_GUIDE, CC_MEMO_TEMPLATE
+from prompts.brand_guardrails import BRAND_GUARDRAILS
+from prompts.audience_profiles import AUDIENCE_PROFILES
+
+
+class MemoArchitectAgent(BaseAgent):
+    name = "memo_architect"
+
+    system_prompt = f"""You are the Memo Architect for Techcombank CIBG Structured Finance.
+
+{TCB_TONE_GUIDE}
+
+{BRAND_GUARDRAILS}
+
+Always produce stakeholder-ready output. If data is missing, state it explicitly.
+"""
+
+    def write_memo(self, state: DealState) -> str:
+        audience_key = (state.audience or "credit_committee").strip().lower().replace(" ", "_")
+        profile = AUDIENCE_PROFILES.get(audience_key, AUDIENCE_PROFILES["credit_committee"])
+        revision_brief = state.advisor_feedback.strip()
+
+        deal_summary = {
+            "borrower": state.parsed_terms.get("borrower", "NOT PROVIDED"),
+            "facility": f"{state.parsed_terms.get('amount', '?')} {state.parsed_terms.get('currency', '')} {state.parsed_terms.get('facility_type', '')}",
+            "tenor": state.parsed_terms.get("tenor", "NOT PROVIDED"),
+            "pricing": state.parsed_terms.get("pricing", "NOT PROVIDED"),
+            "purpose": state.parsed_terms.get("purpose", "NOT PROVIDED"),
+            "security": state.parsed_terms.get("security", "NOT PROVIDED"),
+        }
+
+        prompt = f"""Write a complete credit committee memo.
+
+AUDIENCE PROFILE:
+{json.dumps(profile, indent=2)}
+
+DEAL SUMMARY:
+{json.dumps(deal_summary, indent=2)}
+
+FULL DEAL TERMS:
+{json.dumps(state.parsed_terms, indent=2)}
+
+FINANCIAL ANALYSIS (Python-verified numbers):
+{json.dumps(state.financial_model.get('calculated_metrics', {}), indent=2)}
+
+Financial Narrative:
+{state.financial_model.get('narrative', 'NOT AVAILABLE')}
+
+MARKET CONTEXT:
+{json.dumps(state.market_context, indent=2)}
+
+COMPLIANCE FLAGS:
+{json.dumps(state.compliance_flags, indent=2)}
+
+REGULATORY SUMMARY:
+{state.regulatory_summary}
+
+If this is a rewrite pass, apply the advisor feedback strictly:
+{revision_brief if revision_brief else "[No revision feedback]"}
+
+Use this structure exactly:
+{CC_MEMO_TEMPLATE}
+
+Rules:
+- No emoji/icons.
+- No AI filler.
+- Precise, professional, concise.
+- Explicit recommendation and conditions.
+- 800-1200 words.
+"""
+        return self.call_llm(prompt)
+
+    def run(self, state: DealState) -> dict:
+        print("[Memo Architect] Writing credit committee memo...")
+        memo = self.write_memo(state)
+        state.draft_memo = memo
+        state.mark_complete("memo_architect")
+        print(f"[Memo Architect] Memo written ({len(memo.split())} words)")
+        return state.dict()
+
+
+_agent = MemoArchitectAgent()
+
+def run_memo_architect_agent(state: DealState) -> dict:
+    return _agent.run(state)

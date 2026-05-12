@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SF Agentic AI Console</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="bg-noise"></div>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Structured Finance Automation</p>
+      <h1>SF Agentic AI Console</h1>
+    </div>
+    <div class="topbar-right">
+      <label class="api-key-label">API key
+        <input id="apiKeyInput" type="password" placeholder="optional SF_API_KEY">
+      </label>
+      <div class="health" id="healthBadge">Checking backend health...</div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="card">
+      <h2>1) Input + Run Config</h2>
+      <div class="row">
+        <label for="fileInput">Upload files</label>
+        <input id="fileInput" type="file" multiple>
+        <button id="uploadBtn" class="btn">Upload</button>
+      </div>
+      <div id="uploadedFiles" class="uploaded-list">No uploaded files yet.</div>
+
+      <div class="grid2">
+        <label>Intent
+          <select id="intent">
+            <option value="memo_only">memo_only</option>
+            <option value="memo_plus_distribution">memo_plus_distribution</option>
+            <option value="memo_plus_holdbook">memo_plus_holdbook</option>
+            <option value="full_e2e">full_e2e</option>
+          </select>
+        </label>
+        <label>Audience
+          <select id="audience">
+            <option value="credit_committee">credit_committee</option>
+            <option value="ceo">ceo</option>
+            <option value="chief_cibg">chief_cibg</option>
+            <option value="external_client">external_client</option>
+          </select>
+        </label>
+        <label>Route mode
+          <select id="routeMode">
+            <option value="auto">auto</option>
+            <option value="full">full</option>
+            <option value="targeted">targeted</option>
+          </select>
+        </label>
+        <label>Post-credit
+          <select id="postCredit">
+            <option value="stop">stop</option>
+            <option value="distribution">distribution</option>
+            <option value="holdbook">holdbook</option>
+            <option value="hybrid">hybrid</option>
+            <option value="ask">ask</option>
+          </select>
+        </label>
+      </div>
+
+      <fieldset>
+        <legend>Target workers (for route_mode=targeted)</legend>
+        <div class="checks">
+          <label><input type="checkbox" value="ingestion" class="workerCheck"> ingestion</label>
+          <label><input type="checkbox" value="market_intel" class="workerCheck"> market_intel</label>
+          <label><input type="checkbox" value="analysis_parallel" class="workerCheck"> analysis_parallel</label>
+          <label><input type="checkbox" value="financial_modeler" class="workerCheck"> financial_modeler</label>
+          <label><input type="checkbox" value="compliance" class="workerCheck"> compliance</label>
+          <label><input type="checkbox" value="memo_architect" class="workerCheck"> memo_architect</label>
+        </div>
+      </fieldset>
+
+      <label>Manager instruction
+        <input id="managerInstruction" type="text" placeholder="e.g. market intel only">
+      </label>
+
+      <label>Direct text input (optional)
+        <textarea id="textInput" rows="5" placeholder="Paste term sheet text when not uploading files"></textarea>
+      </label>
+
+      <div class="checks">
+        <label><input id="autonomous" type="checkbox" checked> autonomous</label>
+        <label><input id="fastMode" type="checkbox"> fast</label>
+        <label><input id="skipPreflight" type="checkbox"> skip_preflight</label>
+        <label><input id="noWebResearch" type="checkbox" checked> no_web_research</label>
+        <label><input id="sampleMode" type="checkbox"> sample input</label>
+      </div>
+
+      <div class="actions">
+        <button id="startRunBtn" class="btn btn-primary">Start Run</button>
+        <button id="refreshRunsBtn" class="btn">Refresh Runs</button>
+      </div>
+      <p id="runCreateStatus" class="muted"></p>
+    </section>
+
+    <section class="card">
+      <h2>2) Run Monitor</h2>
+      <div class="actions">
+        <button id="workerStartBtn" class="btn">Start Worker</button>
+        <button id="workerStopBtn" class="btn">Stop Worker</button>
+        <button id="workerStatusBtn" class="btn">Worker Status</button>
+      </div>
+      <pre id="workerStatus" class="logs compact-logs">Worker status not loaded yet.</pre>
+
+      <div id="currentRunMeta" class="meta-box">No run selected.</div>
+
+      <div class="actions">
+        <button data-action="pause" class="btn controlBtn">Pause Worker</button>
+        <button data-action="resume" class="btn controlBtn">Resume Worker</button>
+        <button data-action="status" class="btn controlBtn">Worker Status</button>
+        <button data-action="send_latest_report" class="btn controlBtn">Send Latest Report</button>
+        <button data-action="cancel_current_run" class="btn btn-danger controlBtn">Cancel Selected Run</button>
+      </div>
+      <p id="controlStatus" class="muted"></p>
+
+      <h3>Artifacts</h3>
+      <div id="artifacts" class="artifact-list">No artifacts yet.</div>
+
+      <h3>Logs (tail)</h3>
+      <pre id="logs" class="logs">No logs yet.</pre>
+
+      <h3>Recent Runs</h3>
+      <div id="runs" class="runs-list">No runs yet.</div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

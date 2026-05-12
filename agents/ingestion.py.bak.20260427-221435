@@ -1,0 +1,120 @@
+"""
+agents/ingestion.py — Ingestion Agent
+
+Role: Reads the raw deal document and extracts structured deal terms.
+
+Input:  state.input_text  (raw text from term sheet, pasted or OCR-extracted)
+Output: state.parsed_terms  (structured JSON with all key deal parameters)
+
+This is always the first agent to run. Everything downstream depends on
+the structured terms it produces.
+"""
+
+import json
+import re
+from agents.base import BaseAgent
+from workflow.state import DealState
+
+
+class IngestionAgent(BaseAgent):
+
+    name = "ingestion"
+
+    system_prompt = """You are a structured finance document analyst at Techcombank (TCB) in Vietnam.
+
+Your job is to read raw term sheet text and extract all key deal parameters into a structured format.
+
+You must:
+1. Extract every commercial term precisely as stated in the document
+2. Flag anything ambiguous or missing with [MISSING] or [UNCLEAR]
+3. Identify the governing law and regulatory framework (Vietnamese law vs international)
+4. Note whether financials appear to be IFRS or VAS (Vietnamese Accounting Standards)
+5. Never invent numbers — if a figure is not in the document, say [NOT PROVIDED]
+
+Output format: Always respond with a valid JSON object. No explanation, no preamble — just JSON.
+"""
+
+    def extract_terms(self, raw_text: str) -> dict:
+        """Parse the raw document text into structured deal terms."""
+
+        prompt = f"""Extract all deal terms from this document into a JSON object.
+
+Use exactly these keys (add [NOT PROVIDED] if the document doesn't mention it):
+{{
+  "borrower": "full legal name",
+  "borrower_type": "SOE / Private / FDI / JV / Other",
+  "facility_type": "e.g. Term Loan, Revolving Credit, Bond, LC, etc.",
+  "amount": "numeric amount",
+  "currency": "VND / USD / EUR / etc.",
+  "tenor": "duration e.g. 5 years",
+  "pricing": "interest rate / margin / spread",
+  "pricing_basis": "fixed / floating / VND base rate / SOFR / etc.",
+  "security": "collateral description",
+  "security_value": "collateral value if stated",
+  "purpose": "use of proceeds",
+  "repayment_schedule": "e.g. semi-annual / bullet / amortising",
+  "covenants": ["list", "of", "covenants"],
+  "conditions_precedent": ["list of CPs"],
+  "governing_law": "Vietnamese law / Singapore law / etc.",
+  "accounting_standard": "IFRS / VAS / Unknown",
+  "deal_parties": {{
+    "mandated_lead_arranger": "[NOT PROVIDED]",
+    "facility_agent": "[NOT PROVIDED]",
+    "security_agent": "[NOT PROVIDED]"
+  }},
+  "key_dates": {{
+    "signing_date": "[NOT PROVIDED]",
+    "availability_period": "[NOT PROVIDED]",
+    "maturity_date": "[NOT PROVIDED]"
+  }},
+  "missing_or_unclear": ["list anything that was ambiguous or absent"]
+}}
+
+DOCUMENT:
+{raw_text}
+
+Respond with JSON only. No other text."""
+
+        response = self.call_llm(prompt)
+
+        # Try to extract JSON from the response
+        try:
+            # Sometimes the model wraps JSON in markdown code blocks — strip them
+            cleaned = re.sub(r"```(?:json)?\n?", "", response).replace("```", "").strip()
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            print(f"[Ingestion] JSON parse failed, returning raw response")
+            return {
+                "raw_extraction": response,
+                "parse_error": "Model response was not valid JSON",
+                "missing_or_unclear": ["Full extraction failed — review raw_extraction"]
+            }
+
+    def run(self, state: DealState) -> dict:
+        """Main entry point called by LangGraph."""
+        print(f"[Ingestion] Processing document ({len(state.input_text)} chars)...")
+
+        if not state.input_text.strip():
+            state.add_error("ingestion", "No input text provided")
+            state.mark_complete("ingestion")
+            return state.dict()
+
+        # Clean up the raw text (remove excessive whitespace)
+        raw_text = " ".join(state.input_text.split())
+
+        # Extract structured terms
+        parsed = self.extract_terms(raw_text)
+
+        print(f"[Ingestion] Extracted {len(parsed)} top-level fields")
+        state.raw_text = raw_text
+        state.parsed_terms = parsed
+        state.mark_complete("ingestion")
+
+        return state.dict()
+
+
+# LangGraph node function — this is what graph.py imports
+_agent = IngestionAgent()
+
+def run_ingestion_agent(state: DealState) -> dict:
+    return _agent.run(state)

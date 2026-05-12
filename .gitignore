@@ -1,0 +1,36 @@
+# OS noise
+.DS_Store
+
+# Local env/config
+.env
+.venv/
+
+# Python cache/build
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Runtime data artifacts
+data/local/
+data/api/logs/
+data/api/uploads/
+data/output/
+data/checkpoints/
+
+# PID/log files
+*.pid
+*.log
+
+# Optional generated UI/build artifacts
+dist/
+
+# Local Hermes/workspace metadata
+.hermes/
+
+# Local scratch/work folders
+Coding Agent Framework/
+
+# Mutable API state snapshots
+data/api/runs.json
+data/api/ui_config.json
+data/api/uploads.json

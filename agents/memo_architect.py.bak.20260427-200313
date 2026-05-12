@@ -1,0 +1,139 @@
+"""
+agents/memo_architect.py — Memo Architect (Writer Agent)
+
+Role: Assembles all agent outputs into a full credit committee memo.
+
+Input:  All prior agent outputs (parsed_terms, market_context,
+        financial_model, compliance_flags)
+Output: state.draft_memo  (complete CC memo in TCB tone)
+
+This is the final agent in the pipeline. It synthesises everything
+that the other four agents produced and writes it as a coherent,
+professional credit committee memorandum.
+
+TCB Credit Memo Structure:
+  1. Deal Summary / Executive Overview
+  2. Borrower Background
+  3. Transaction Structure
+  4. Financial Analysis
+  5. Market & Sector Context
+  6. Security & Collateral
+  7. Regulatory & Compliance Assessment
+  8. Risk Assessment & Mitigants
+  9. Conditions & Covenants
+  10. Recommendation
+"""
+
+import json
+from agents.base import BaseAgent
+from workflow.state import DealState
+from prompts.tcb_tone import TCB_TONE_GUIDE, CC_MEMO_TEMPLATE
+
+
+class MemoArchitectAgent(BaseAgent):
+
+    name = "memo_architect"
+
+    system_prompt = f"""You are the Memo Architect for Techcombank CIBG's Structured Finance team.
+
+Your role is to write credit committee memos that are:
+- Analytically rigorous and precise
+- Written in formal, professional English appropriate for a Vietnamese commercial bank
+- Free of filler language, hedging, and AI-sounding phrasing
+- Structured clearly for a senior credit committee audience
+- Explicit about data sources, assumptions, and uncertainties
+
+{TCB_TONE_GUIDE}
+
+IMPORTANT: Where data gaps exist, state them explicitly rather than filling with
+generic language. A credit committee can work with an honest gap; it cannot work
+with fabricated analysis.
+"""
+
+    def write_memo(self, state: DealState) -> str:
+        """Assemble the full credit committee memo from all agent outputs."""
+
+        # Build a comprehensive context package for the LLM
+        deal_summary = {
+            "borrower": state.parsed_terms.get("borrower", "NOT PROVIDED"),
+            "facility": f"{state.parsed_terms.get('amount', '?')} {state.parsed_terms.get('currency', '')} "
+                       f"{state.parsed_terms.get('facility_type', '')}",
+            "tenor": state.parsed_terms.get("tenor", "NOT PROVIDED"),
+            "pricing": state.parsed_terms.get("pricing", "NOT PROVIDED"),
+            "purpose": state.parsed_terms.get("purpose", "NOT PROVIDED"),
+            "security": state.parsed_terms.get("security", "NOT PROVIDED"),
+        }
+
+        high_compliance_flags = [
+            f for f in state.compliance_flags
+            if f.get("severity") == "HIGH"
+        ]
+
+        prompt = f"""Write a complete credit committee memo using the data below.
+
+Follow the TCB CC memo structure exactly. Use formal English. Be precise and direct.
+Where data is missing, say so — do not fabricate.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DEAL SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{json.dumps(deal_summary, indent=2)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FULL DEAL TERMS (from Ingestion Agent)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{json.dumps(state.parsed_terms, indent=2)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FINANCIAL ANALYSIS (Python-verified numbers)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{json.dumps(state.financial_model.get('calculated_metrics', {}), indent=2)}
+
+Financial Narrative:
+{state.financial_model.get('narrative', 'NOT AVAILABLE')}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MARKET & SECTOR CONTEXT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{json.dumps(state.market_context, indent=2)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+COMPLIANCE FLAGS ({len(state.compliance_flags)} total, {len(high_compliance_flags)} HIGH)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{json.dumps(state.compliance_flags, indent=2)}
+
+Regulatory Summary:
+{state.regulatory_summary}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WRITE THE CREDIT COMMITTEE MEMO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use this structure:
+{CC_MEMO_TEMPLATE}
+
+Target length: 800-1200 words.
+Do not use bullet points in the main narrative — write in paragraphs.
+Use headings for each section.
+End with a clear Recommendation (Approve / Approve with conditions / Decline)
+and list any conditions precedent to drawdown."""
+
+        return self.call_llm(prompt)
+
+    def run(self, state: DealState) -> dict:
+        print(f"[Memo Architect] Writing credit committee memo...")
+
+        memo = self.write_memo(state)
+        state.draft_memo = memo
+        state.mark_complete("memo_architect")
+
+        word_count = len(memo.split())
+        print(f"[Memo Architect] Memo written ({word_count} words)")
+
+        return state.dict()
+
+
+_agent = MemoArchitectAgent()
+
+def run_memo_architect_agent(state: DealState) -> dict:
+    return _agent.run(state)

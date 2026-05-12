@@ -1,0 +1,270 @@
+openapi: 3.1.0
+info:
+  title: Michael Dao's Agentic AI Flow
+  version: 0.1.0
+  description: |
+    UI ↔ cloud API ↔ on-laptop Hermes worker.
+    Feed this file to your coding model to generate clients/servers in any language.
+
+servers:
+  - url: http://localhost:4000
+    description: Mock / local
+  - url: https://api.michaeldao.io
+    description: Production
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+
+  schemas:
+    Job:
+      type: object
+      properties:
+        id: { type: string, example: JOB-1042 }
+        name: { type: string }
+        task_type: { type: string, enum: [doc, ppt, xlsx, scrape, convert, custom] }
+        status: { type: string, enum: [pending, claimed, running, awaiting_review, uploading, done, failed, cancelled] }
+        progress: { type: number, minimum: 0, maximum: 1 }
+        prompt: { type: string }
+        created_at: { type: string, format: date-time }
+        inputs:
+          type: object
+          properties:
+            files: { type: array, items: { type: string } }
+            drive_link: { type: string, nullable: true }
+            onedrive_link: { type: string, nullable: true }
+            urls: { type: array, items: { type: string } }
+        output:
+          type: object
+          additionalProperties: true
+        config:
+          type: object
+          properties:
+            planner: { type: string }
+            max_steps: { type: integer }
+            time_budget_sec: { type: integer }
+            pause_for_review: { type: boolean }
+            tools_allowed: { type: array, items: { type: string } }
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              index: { type: integer }
+              title: { type: string }
+              detail: { type: string }
+              ts: { type: string, format: date-time }
+              status: { type: string, enum: [pending, running, done, failed] }
+        log:
+          type: array
+          items:
+            type: object
+            properties:
+              ts: { type: string, format: date-time }
+              level: { type: string, enum: [info, tool, ok, warn, err] }
+              msg: { type: string }
+        artifacts:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              kind: { type: string }
+              size: { type: integer }
+              url:  { type: string }
+              where: { type: string }
+        tokens:
+          type: object
+          properties: { in: { type: integer }, out: { type: integer } }
+        cost_usd: { type: number }
+
+    NewJob:
+      type: object
+      required: [idempotency_key, task_type, prompt]
+      properties:
+        idempotency_key: { type: string, format: uuid }
+        name: { type: string }
+        task_type: { type: string }
+        prompt: { type: string }
+        inputs: { type: object }
+        output: { type: object }
+        config: { type: object }
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            retry_after_sec: { type: integer }
+
+paths:
+  /jobs:
+    get:
+      summary: List jobs
+      parameters:
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: limit, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Job" } }
+                  next:  { type: string, nullable: true }
+    post:
+      summary: Create a job
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/NewJob" } } }
+      responses:
+        "201":
+          description: Created
+          content: { application/json: { schema: { $ref: "#/components/schemas/Job" } } }
+
+  /jobs/{id}:
+    get:
+      parameters: [ { in: path, name: id, required: true, schema: { type: string } } ]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Job" } } } }
+        "404": { description: Not found, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+
+  /jobs/{id}/events:
+    get:
+      summary: Server-Sent Events stream for a job
+      parameters: [ { in: path, name: id, required: true, schema: { type: string } } ]
+      responses:
+        "200":
+          description: text/event-stream
+          content: { text/event-stream: {} }
+
+  /jobs/{id}/cancel:
+    post:
+      parameters: [ { in: path, name: id, required: true, schema: { type: string } } ]
+      responses: { "200": { description: OK } }
+
+  /jobs/{id}/approve:
+    post:
+      parameters: [ { in: path, name: id, required: true, schema: { type: string } } ]
+      responses: { "200": { description: OK } }
+
+  /uploads/sign:
+    post:
+      summary: Get a presigned PUT URL for an input file
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename, size]
+              properties:
+                filename: { type: string }
+                size: { type: integer }
+                content_type: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  blob_id: { type: string }
+                  put_url: { type: string }
+                  expires_at: { type: string }
+
+  /integrations:
+    get:
+      responses: { "200": { description: OK } }
+
+  /me:
+    get:
+      responses: { "200": { description: OK } }
+
+  /worker/claim:
+    post:
+      summary: Worker claims the next pending job (long-poll)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                worker_id: { type: string }
+                version: { type: string }
+                tools_available: { type: array, items: { type: string } }
+      responses:
+        "200": { description: Job claimed, content: { application/json: { schema: { $ref: "#/components/schemas/Job" } } } }
+        "204": { description: No work }
+
+  /worker/jobs/{id}/events:
+    post:
+      summary: Worker pushes a step/log/progress/status/artifact event
+      parameters: [ { in: path, name: id, required: true, schema: { type: string } } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event: { type: string, enum: [step, log, progress, status, artifact] }
+                data: { type: object }
+      responses: { "200": { description: OK } }
+
+  /worker/jobs/{id}/upload-url:
+    post:
+      parameters: [ { in: path, name: id, required: true, schema: { type: string } } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename, size]
+              properties:
+                filename: { type: string }
+                kind: { type: string }
+                size: { type: integer }
+      responses: { "200": { description: OK } }
+
+  /worker/jobs/{id}/finish:
+    post:
+      parameters: [ { in: path, name: id, required: true, schema: { type: string } } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [done, failed] }
+                error: { type: string }
+                artifacts: { type: array, items: { type: object } }
+                tokens: { type: object }
+                cost_usd: { type: number }
+      responses: { "200": { description: OK } }
+
+  /worker/heartbeat:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                worker_id: { type: string }
+                queue_depth: { type: integer }
+                current_job_id: { type: string }
+      responses: { "200": { description: OK } }

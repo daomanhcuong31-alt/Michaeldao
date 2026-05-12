@@ -1,0 +1,28 @@
+# SF Agentic AI — Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# ── Core LLM & Agent Framework ──────────────────────────────────────────────
+openai>=1.30.0              # Talks to LM Studio's OpenAI-compatible server
+langgraph>=0.2.0            # Agent graph orchestration (Manager-Worker model)
+langchain>=0.2.0            # Base utilities for LangGraph
+langchain-openai>=0.1.0     # LangChain adapter for OpenAI-compatible endpoints
+
+# ── Local Vector Database (replaces Pinecone — runs 100% on your Mac) ───────
+chromadb>=0.5.0             # Local vector store for document memory
+sentence-transformers>=3.0.0  # Converts text to vectors locally
+
+# ── Document Processing & OCR ────────────────────────────────────────────────
+pdfplumber>=0.11.0          # Extracts text and tables from PDFs
+pytesseract>=0.3.10         # OCR for scanned images in PDFs
+Pillow>=10.0.0              # Image handling (required by pytesseract)
+
+# ── Financial Computation ────────────────────────────────────────────────────
+pandas>=2.0.0               # Data tables and calculations
+numpy>=1.26.0               # Numerical operations
+openpyxl>=3.1.0             # Read/write Excel files
+
+# ── Utilities ────────────────────────────────────────────────────────────────
+python-dotenv>=1.0.0        # Loads .env settings file
+pydantic>=2.0.0             # Data validation (used by LangGraph state)
+rich>=13.0.0                # Nice terminal output for debugging
+httpx>=0.27.0               # HTTP requests (for fetching market data)

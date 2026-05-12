@@ -1,0 +1,67 @@
+// Lightweight stroke icons (Lucide-style, hand-tuned)
+const Ico = ({ d, size = 16, fill, stroke = "currentColor", sw = 1.6, children, ...p }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill || "none"} stroke={stroke}
+    strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" {...p}>
+    {d ? <path d={d} /> : children}
+  </svg>
+);
+
+const I = {
+  Home:    (p) => <Ico {...p}><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></Ico>,
+  Plus:    (p) => <Ico {...p}><path d="M12 5v14M5 12h14"/></Ico>,
+  Play:    (p) => <Ico {...p}><path d="M6 4l14 8-14 8z"/></Ico>,
+  Pause:   (p) => <Ico {...p}><path d="M7 4v16M17 4v16"/></Ico>,
+  Stop:    (p) => <Ico {...p}><rect x="6" y="6" width="12" height="12" rx="1.5"/></Ico>,
+  List:    (p) => <Ico {...p}><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></Ico>,
+  History: (p) => <Ico {...p}><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></Ico>,
+  Plug:    (p) => <Ico {...p}><path d="M9 2v6M15 2v6M5 8h14v3a7 7 0 0 1-14 0z"/><path d="M12 18v4"/></Ico>,
+  Settings:(p) => <Ico {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.36.13.66.36.88.65"/></Ico>,
+  Search:  (p) => <Ico {...p}><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></Ico>,
+  Bell:    (p) => <Ico {...p}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></Ico>,
+  Upload:  (p) => <Ico {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></Ico>,
+  Download:(p) => <Ico {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></Ico>,
+  File:    (p) => <Ico {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></Ico>,
+  Folder:  (p) => <Ico {...p}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></Ico>,
+  Link:    (p) => <Ico {...p}><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></Ico>,
+  Globe:   (p) => <Ico {...p}><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/></Ico>,
+  Chat:    (p) => <Ico {...p}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></Ico>,
+  MessageSquare: (p) => <I.Chat {...p} />,
+  Form:    (p) => <Ico {...p}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></Ico>,
+  Sparkle: (p) => <Ico {...p}><path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6z"/><path d="M19 3v4M21 5h-4"/></Ico>,
+  Check:   (p) => <Ico {...p}><path d="M5 12l5 5L20 7"/></Ico>,
+  X:       (p) => <Ico {...p}><path d="M18 6L6 18M6 6l12 12"/></Ico>,
+  Chevron: (p) => <Ico {...p}><path d="M9 6l6 6-6 6"/></Ico>,
+  Cmd:     (p) => <Ico {...p}><path d="M9 9V5a2 2 0 1 0-2 2h10a2 2 0 1 0-2-2v4M9 9h6v6H9z"/><path d="M9 15v4a2 2 0 1 1-2-2h10a2 2 0 1 1-2 2v-4"/></Ico>,
+  Refresh: (p) => <Ico {...p}><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></Ico>,
+  More:    (p) => <Ico {...p}><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></Ico>,
+  Trash:   (p) => <Ico {...p}><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></Ico>,
+  Eye:     (p) => <Ico {...p}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></Ico>,
+  Copy:    (p) => <Ico {...p}><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></Ico>,
+  Send:    (p) => <Ico {...p}><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></Ico>,
+  Box:     (p) => <Ico {...p}><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7L12 12l8.7-5"/><path d="M12 22V12"/></Ico>,
+  Sun:     (p) => <Ico {...p}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></Ico>,
+  Moon:    (p) => <Ico {...p}><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></Ico>,
+  Bolt:    (p) => <Ico {...p}><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></Ico>,
+  Clock:   (p) => <Ico {...p}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></Ico>,
+  Doc:     (p) => <Ico {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></Ico>,
+  Database:(p) => <Ico {...p}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.7-4 3-9 3s-9-1.3-9-3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/></Ico>,
+  Image:   (p) => <Ico {...p}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></Ico>,
+  Pencil:  (p) => <Ico {...p}><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></Ico>,
+  Edit3:   (p) => <I.Pencil {...p} />,
+  Brain:   (p) => <Ico {...p}><path d="M9 3a3 3 0 0 0-3 3v.5A3 3 0 0 0 4 9v2a3 3 0 0 0 1 2.2 3 3 0 0 0-1 2.3v.5a3 3 0 0 0 3 3h2a3 3 0 0 0 3-3V6a3 3 0 0 0-3-3z"/><path d="M15 3a3 3 0 0 1 3 3v.5A3 3 0 0 1 20 9v2a3 3 0 0 1-1 2.2 3 3 0 0 1 1 2.3v.5a3 3 0 0 1-3 3h-2a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z"/></Ico>,
+  Telegram:(p) => <Ico {...p} sw="0"><path fill="currentColor" d="M21.5 4.2 18.6 19.5c-.2 1-.8 1.2-1.6.7l-4.4-3.2-2.1 2c-.2.2-.4.4-.9.4l.3-4.5 8.2-7.4c.4-.3-.1-.5-.6-.2L7.4 13.7l-4.3-1.4c-.9-.3-.9-.9.2-1.4l16.8-6.5c.8-.3 1.5.2 1.4 1.8z"/></Ico>,
+  Drive:   (p) => <Ico {...p} sw="0"><path fill="#1FA463" d="M7.7 21l-3-5.2 5-8.6 3 5.2z"/><path fill="#FFC107" d="M12 7.2 9 2h6l3 5.2z"/><path fill="#4285F4" d="m12.7 12.4 2.3-4 4 6.9-4.7.1z"/><path fill="#1967D2" d="M16.3 21H7.7l3-5.2 6.6-.1z"/><path fill="#34A853" d="m9.7 15.8 5-8.6h3.6l-3 5.2z" opacity=".7"/></Ico>,
+  OneDrive:(p) => <Ico {...p} sw="0"><path fill="#0364B8" d="M14 7c2.5 0 4.6 1.7 5.2 4 1.6.3 2.8 1.7 2.8 3.5a3.5 3.5 0 0 1-3.5 3.5h-13A4.5 4.5 0 0 1 1 13.5C1 11.3 2.5 9.5 4.5 9c.7-2.3 2.9-4 5.5-4 1.7 0 3.2.7 4.3 1.8.3-.1.6-.1.7-.1z"/></Ico>,
+  Slack:      (p) => <Ico {...p} sw="0"><path fill="currentColor" d="M5 14a2 2 0 1 1 0-4h2v2a2 2 0 0 1-2 2zm1-7a2 2 0 1 1 4 0v3H8a2 2 0 0 1-2-3zm7-1a2 2 0 1 1 4 0v2h-2a2 2 0 0 1-2-2zM12 7v3a2 2 0 1 1-4 0V7zm5 4h2a2 2 0 1 1-2 2zm-1 7a2 2 0 1 1-4 0v-3h2a2 2 0 0 1 2 3zm-7 0a2 2 0 1 1-4 0v-2h2a2 2 0 0 1 2 2zm0-5v-3a2 2 0 1 1 4 0v3z"/></Ico>,
+  HardDrive:  (p) => <Ico {...p}><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 18h.01M10 18h.01"/><path d="M2 14l4-8h12l4 8"/></Ico>,
+  Key:        (p) => <Ico {...p}><circle cx="8" cy="15" r="4"/><path d="M12 11l8-8"/><path d="M17 6l2 2"/><path d="M20 9l-2-2"/></Ico>,
+  Cpu:        (p) => <Ico {...p}><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></Ico>,
+  Teams:      (p) => <Ico {...p} sw="0"><path fill="#5059C9" d="M14 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path fill="#7B83EB" d="M9.5 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path fill="#5059C9" d="M14 12h4a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2z"/><path fill="#7B83EB" d="M4 13a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4v-6z"/><path fill="#fff" fillOpacity=".8" d="M9.5 20v-7M6 13.5h7"/></Ico>,
+  Zalo:       (p) => <Ico {...p} sw="0"><rect fill="#0068FF" x="2" y="2" width="20" height="20" rx="5"/><text x="5" y="16.5" fontFamily="Arial" fontWeight="800" fontSize="9" fill="white">ZALO</text></Ico>,
+  Gemini:     (p) => <Ico {...p} sw="0"><defs><linearGradient id="gem" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#4285F4"/><stop offset="50%" stopColor="#EA4335"/><stop offset="100%" stopColor="#34A853"/></linearGradient></defs><path fill="url(#gem)" d="M12 3C12 3 7 8 7 12s5 9 5 9 5-4 5-9-5-9-5-9z"/><path fill="url(#gem)" d="M3 12c0 0 4-5 9-5s9 5 9 5-4 5-9 5-9-5-9-5z" opacity=".7"/></Ico>,
+  Tavily:     (p) => <Ico {...p}><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/><circle cx="12" cy="12" r="8" strokeDasharray="3 3"/></Ico>,
+  Perplexity: (p) => <Ico {...p}><path d="M12 3l4 4H8z"/><path d="M8 7h8v10H8z"/><path d="M8 17l-4 4M16 17l4 4"/><path d="M12 7v10"/></Ico>,
+  Qwen:       (p) => <Ico {...p}><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><path d="M13 17h8M17 13v8"/></Ico>,
+};
+
+window.I = I;

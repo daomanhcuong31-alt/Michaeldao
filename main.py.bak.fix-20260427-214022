@@ -1,0 +1,229 @@
+"""
+main.py — SF Agentic AI System entry point
+
+Run this after Phase 0 passes (test_connection.py succeeds).
+
+Usage:
+    # Process a pasted term sheet:
+    python main.py --text "Borrower: ABC Corp. Facility: USD 10M Term Loan..."
+
+    # Process a PDF file:
+    python main.py --file ./data/uploads/term_sheet.pdf
+
+    # Interactive mode (prompts for input):
+    python main.py
+
+The system will run all 5 agents in sequence and save the
+credit committee memo to ./data/output/
+"""
+
+import argparse
+import sys
+import os
+from datetime import datetime
+from pathlib import Path
+from rich.console import Console
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
+
+console = Console()
+
+# Sample term sheet for testing — replace with your real deal
+SAMPLE_TERM_SHEET = """
+TERM SHEET — INDICATIVE (NOT BINDING)
+Date: April 2026
+
+Borrower: Viet Nam Industrial Development Corporation (VIDC)
+Borrower Type: State-Owned Enterprise (100% Government Owned)
+Facility Type: Syndicated Term Loan
+Amount: USD 25,000,000 (Twenty-Five Million US Dollars)
+Currency: USD
+Tenor: 5 years from first drawdown
+Pricing: SOFR + 3.50% per annum
+Pricing Basis: Floating rate, reset quarterly
+Purpose: Acquisition of industrial machinery and equipment for expansion
+         of manufacturing capacity at Binh Duong facility
+Repayment: Semi-annual equal principal instalments
+Security:
+  - First-ranking mortgage over industrial land use rights (LUR),
+    land parcel BDG-2024-001, Binh Duong Province
+  - Appraised value: USD 38,000,000 (independent valuation, March 2026)
+  - Assignment of receivables under offtake agreements
+Covenants:
+  - DSCR minimum 1.20x (tested semi-annually, IFRS basis)
+  - Leverage ratio maximum 3.5x Net Debt / EBITDA
+  - No additional indebtedness > USD 5,000,000 without lender consent
+  - Annual audited financial statements within 120 days of year-end
+Conditions Precedent:
+  - Legal opinions from Vietnamese and international counsel
+  - Environmental and social assessment report
+  - Ministry of Planning approval for foreign currency borrowing
+Governing Law: Vietnamese Law
+Accounting Standard: IFRS (Borrower prepares consolidated IFRS accounts)
+Financial Year End: December 31
+Historical EBITDA (FY2025, IFRS, audited): USD 7,200,000
+Total Existing Debt: USD 15,000,000
+"""
+
+
+def process_deal(input_text: str = None, file_path: str = None) -> str:
+    """
+    Run the full agent pipeline on a deal.
+
+    Returns the credit committee memo as a string.
+    """
+    # ── Verify LM Studio connection first ────────────────────────────────────
+    console.print("\n[bold]Step 1/6:[/bold] Checking LM Studio connection...")
+    from config import verify_connection, settings
+    if not verify_connection():
+        console.print("[red]✗ LM Studio is not responding.[/red]")
+        console.print("  Make sure LM Studio is open and the server is started.")
+        sys.exit(1)
+    console.print(f"[green]✓ LM Studio connected ({settings.model})[/green]")
+
+    # ── Extract text if file was provided ────────────────────────────────────
+    if file_path and not input_text:
+        console.print(f"\n[bold]Step 2/6:[/bold] Extracting text from {file_path}...")
+        from tools.ocr import extract_text_from_pdf
+        ocr_result = extract_text_from_pdf(file_path)
+        input_text = ocr_result["text"]
+
+        if ocr_result["warnings"]:
+            for w in ocr_result["warnings"]:
+                console.print(f"  [yellow]⚠ {w}[/yellow]")
+
+        if ocr_result["quality"] in ("FAILED", "EMPTY"):
+            console.print("[red]✗ Could not extract text from document.[/red]")
+            sys.exit(1)
+
+        console.print(f"[green]✓ Extracted {len(input_text)} characters ({ocr_result['pages']} pages)[/green]")
+    else:
+        console.print(f"\n[bold]Step 2/6:[/bold] Using provided text ({len(input_text)} chars) ✓")
+
+    # ── Run the agent pipeline ────────────────────────────────────────────────
+    console.print("\n[bold]Step 3/6:[/bold] Running agent pipeline...")
+    console.print("  [dim]5 agents will run in sequence — this takes 2-5 minutes[/dim]")
+    console.print("  [dim]Watch the [Agent] log lines to see each step complete[/dim]\n")
+
+    from workflow.graph import run_pipeline
+    final_state = run_pipeline(input_text=input_text, file_path=file_path)
+
+    # ── Show pipeline summary ─────────────────────────────────────────────────
+    console.print("\n[bold]Step 4/6:[/bold] Pipeline complete. Summary:")
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Agent", style="cyan")
+    table.add_column("Status")
+    table.add_column("Notes")
+
+    agents = ["ingestion", "market_intel", "financial_modeler", "compliance", "memo_architect", "senior_advisor"]
+    agent_labels = {
+        "ingestion": "Ingestion",
+        "market_intel": "Market Intelligence",
+        "financial_modeler": "Financial Modeler",
+        "compliance": "Compliance & Risk",
+        "memo_architect": "Memo Architect",\n        "senior_advisor": "Senior Advisor"
+    }
+
+    for agent in agents:
+        done = agent in final_state.completed_steps
+        errors = [e for e in final_state.errors if e.get("agent") == agent]
+        status = "[green]✓ Complete[/green]" if done else "[red]✗ Incomplete[/red]"
+        notes = errors[0]["error"] if errors else "—"
+        table.add_row(agent_labels[agent], status, notes[:60])
+
+    console.print(table)
+    console.print(f"\n[bold]Senior Advisor Decision:[/bold] {getattr(final_state, 'quality_gate_decision', 'N/A')}  "
+                  f"(score: {getattr(final_state, 'quality_score', 'N/A')})")
+
+
+    if final_state.errors:
+        console.print(f"\n[yellow]⚠ {len(final_state.errors)} error(s) encountered — review above[/yellow]")
+
+    # ── Save the memo ─────────────────────────────────────────────────────────
+    console.print("\n[bold]Step 5/6:[/bold] Saving credit memo...")
+    output_dir = Path("./data/output")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    borrower = final_state.parsed_terms.get("borrower", "unknown")
+    safe_name = "".join(c for c in borrower if c.isalnum() or c in " _-")[:30].strip()
+    output_file = output_dir / f"CC_Memo_{safe_name}_{timestamp}.txt"
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(final_state.draft_memo)
+
+    console.print(f"[green]✓ Memo saved: {output_file}[/green]")
+
+    # ── Display the memo ──────────────────────────────────────────────────────
+    console.print("\n[bold]Step 6/6:[/bold] Credit Committee Memo:\n")
+    console.print(Panel(
+        final_state.draft_memo,
+        title="[bold cyan]DRAFT CREDIT COMMITTEE MEMORANDUM[/bold cyan]",
+        border_style="cyan",
+        expand=False
+    ))
+
+    return final_state.draft_memo
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="SF Agentic AI — Automated Credit Memo Generation"
+    )
+    parser.add_argument("--text", type=str, help="Term sheet text (paste directly)")
+    parser.add_argument("--file", type=str, help="Path to PDF or text file")
+    parser.add_argument("--sample", action="store_true", help="Run with built-in sample deal")
+    args = parser.parse_args()
+
+    console.print(Panel.fit(
+        "[bold cyan]SF Agentic AI System[/bold cyan]\n"
+        "[dim]Techcombank CIBG · Structured Finance · Local LLM via LM Studio[/dim]",
+        border_style="cyan"
+    ))
+
+    if args.sample:
+        console.print("[dim]Running with sample term sheet (VIDC deal)...[/dim]")
+        process_deal(input_text=SAMPLE_TERM_SHEET)
+
+    elif args.text:
+        process_deal(input_text=args.text)
+
+    elif args.file:
+        if not os.path.exists(args.file):
+            console.print(f"[red]File not found: {args.file}[/red]")
+            sys.exit(1)
+        process_deal(file_path=args.file)
+
+    else:
+        # Interactive mode
+        console.print("\nNo input provided. Options:\n")
+        console.print("  [bold]1.[/bold] Run with sample deal (quickest way to test)")
+        console.print("  [bold]2.[/bold] Paste a term sheet")
+        console.print("  [bold]3.[/bold] Exit\n")
+
+        choice = input("Choose (1/2/3): ").strip()
+
+        if choice == "1":
+            process_deal(input_text=SAMPLE_TERM_SHEET)
+        elif choice == "2":
+            console.print("\nPaste your term sheet below.")
+            console.print("When done, press Enter twice then type END and press Enter:\n")
+            lines = []
+            while True:
+                line = input()
+                if line.strip() == "END":
+                    break
+                lines.append(line)
+            text = "\n".join(lines)
+            if text.strip():
+                process_deal(input_text=text)
+            else:
+                console.print("[red]No text entered.[/red]")
+        else:
+            console.print("Exiting.")
+            sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

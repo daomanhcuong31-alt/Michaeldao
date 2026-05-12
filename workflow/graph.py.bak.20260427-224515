@@ -1,0 +1,80 @@
+"""
+workflow/graph.py — Wires all agents into the LangGraph pipeline
+"""
+
+from langgraph.graph import StateGraph, END
+from workflow.state import DealState
+from workflow.supervisor import supervisor_node, route_after_supervisor
+from workflow.senior_advisor import run_senior_advisor_agent, route_after_senior_advisor
+
+from agents.ingestion import run_ingestion_agent
+from agents.market_intel import run_market_intel_agent
+from agents.financial_modeler import run_financial_modeler_agent
+from agents.compliance import run_compliance_agent
+from agents.memo_architect import run_memo_architect_agent
+
+
+def build_graph():
+    graph = StateGraph(DealState)
+
+    graph.add_node("supervisor", supervisor_node)
+    graph.add_node("ingestion", run_ingestion_agent)
+    graph.add_node("market_intel", run_market_intel_agent)
+    graph.add_node("financial_modeler", run_financial_modeler_agent)
+    graph.add_node("compliance", run_compliance_agent)
+    graph.add_node("memo_architect", run_memo_architect_agent)
+    graph.add_node("senior_advisor", run_senior_advisor_agent)
+
+    graph.set_entry_point("supervisor")
+
+    graph.add_conditional_edges(
+        "supervisor",
+        route_after_supervisor,
+        {
+            "ingestion": "ingestion",
+            "market_intel": "market_intel",
+            "financial_modeler": "financial_modeler",
+            "compliance": "compliance",
+            "memo_architect": "memo_architect",
+            "END": END,
+        }
+    )
+
+    # Core workers always return to supervisor
+    for agent_name in ["ingestion", "market_intel", "financial_modeler", "compliance"]:
+        graph.add_edge(agent_name, "supervisor")
+
+    # Memo must always pass through senior advisor gate
+    graph.add_edge("memo_architect", "senior_advisor")
+
+    # Advisor decides approve/end vs revise loop
+    graph.add_conditional_edges(
+        "senior_advisor",
+        route_after_senior_advisor,
+        {
+            "memo_architect": "memo_architect",
+            "END": END,
+        }
+    )
+
+    return graph.compile()
+
+
+def run_pipeline(input_text: str, file_path: str = None, audience: str = "credit_committee", max_revisions: int = 1) -> DealState:
+    pipeline = build_graph()
+
+    initial_state = {
+        "input_text": input_text,
+        "input_file_path": file_path,
+        "audience": audience,
+        "max_revisions": max_revisions,
+        "messages": [],
+        "completed_steps": [],
+        "errors": [],
+    }
+
+    print("[Pipeline] Starting SF Agentic AI pipeline...")
+    final_state = pipeline.invoke(initial_state)
+    print("[Pipeline] Complete.")
+
+    return DealState(**final_state)

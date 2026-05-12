@@ -1,0 +1,129 @@
+"""
+workflow/state.py — Shared state passed between all agents
+
+Think of this as the "deal folder" that gets passed from agent to agent.
+Each agent reads from it, adds its findings, and passes it to the next.
+
+Nothing gets lost between steps — the state accumulates context as the
+pipeline progresses from raw document → finished credit memo.
+"""
+
+from typing import Any, Optional
+from pydantic import BaseModel, Field
+
+
+class DealState(BaseModel):
+    """
+    The central state object for the entire SF agent pipeline.
+    Every agent reads and writes to this.
+
+    Fields are populated progressively as each agent completes its work:
+      Step 1 (Ingestion)     → raw_text, parsed_terms
+      Step 2 (Market Intel)  → market_context
+      Step 3 (Financial)     → financial_model
+      Step 4 (Compliance)    → compliance_flags
+      Step 5 (Memo Writer)   → draft_memo
+    """
+
+    # ── Input ────────────────────────────────────────────────────────────────
+    input_text: str = Field(
+        default="",
+        description="Raw input: pasted term sheet text, or extracted PDF text"
+    )
+    input_file_path: Optional[str] = Field(
+        default=None,
+        description="Path to source PDF/document, if provided"
+    )
+
+    # ── Ingestion Agent Output ────────────────────────────────────────────────
+    raw_text: str = Field(
+        default="",
+        description="Cleaned, OCR-processed text from the document"
+    )
+    parsed_terms: dict = Field(
+        default_factory=dict,
+        description=(
+            "Structured deal terms extracted by the Ingestion Agent.\n"
+            "Keys: borrower, facility_type, amount, currency, tenor, pricing,\n"
+            "      security, covenants, purpose, repayment_schedule"
+        )
+    )
+
+    # ── Market Intelligence Agent Output ─────────────────────────────────────
+    market_context: dict = Field(
+        default_factory=dict,
+        description=(
+            "Market benchmarks and macro context.\n"
+            "Keys: sector_overview, comparable_deals, benchmark_rates,\n"
+            "      sbv_policy_context, macro_risks"
+        )
+    )
+
+    # ── Financial Modeler Agent Output ───────────────────────────────────────
+    financial_model: dict = Field(
+        default_factory=dict,
+        description=(
+            "Financial analysis results.\n"
+            "Keys: dscr_analysis, waterfall_summary, stress_scenarios,\n"
+            "      key_ratios, financial_risks"
+        )
+    )
+
+    # ── Compliance & Risk Agent Output ───────────────────────────────────────
+    compliance_flags: list = Field(
+        default_factory=list,
+        description=(
+            "List of compliance issues found.\n"
+            "Each item: {severity: HIGH/MED/LOW, issue, regulation, recommendation}"
+        )
+    )
+    regulatory_summary: str = Field(
+        default="",
+        description="Narrative summary of regulatory position"
+    )
+
+    # ── Memo Architect Output ─────────────────────────────────────────────────
+    draft_memo: str = Field(
+        default="",
+        description="Full credit committee memo in TCB tone and format"
+    )
+
+    # ── Workflow Control ──────────────────────────────────────────────────────
+    current_agent: str = Field(
+        default="supervisor",
+        description="Which agent is currently running"
+    )
+    completed_steps: list = Field(
+        default_factory=list,
+        description="List of agent names that have completed successfully"
+    )
+    errors: list = Field(
+        default_factory=list,
+        description="Any errors encountered during the pipeline"
+    )
+    messages: list = Field(
+        default_factory=list,
+        description="LangGraph message history (required by the framework)"
+    )
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    def mark_complete(self, agent_name: str):
+        """Record that an agent finished successfully."""
+        if agent_name not in self.completed_steps:
+            self.completed_steps.append(agent_name)
+
+    def add_error(self, agent_name: str, error: str):
+        """Log an error without stopping the pipeline."""
+        self.errors.append({"agent": agent_name, "error": error})
+
+    def summary(self) -> str:
+        """Quick status check — useful for debugging."""
+        return (
+            f"Pipeline status:\n"
+            f"  Completed: {', '.join(self.completed_steps) or 'none'}\n"
+            f"  Errors:    {len(self.errors)}\n"
+            f"  Current:   {self.current_agent}\n"
+            f"  Memo:      {'ready' if self.draft_memo else 'not yet written'}"
+        )

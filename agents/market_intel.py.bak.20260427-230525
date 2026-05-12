@@ -1,0 +1,130 @@
+"""
+agents/market_intel.py — Market Intelligence Agent
+
+Role: Provides macro and sector context for the deal.
+
+Input:  state.parsed_terms  (deal structure from Ingestion agent)
+Output: state.market_context  (benchmarks, sector overview, macro risks)
+
+In v1, this agent reasons from its training knowledge + your local
+knowledge base. In v2, you can wire it to real-time SBV/HNX feeds.
+
+Sources it should reference (from training knowledge):
+- SBV monetary policy and lending rate directives
+- HNX / HOSE bond market data
+- GSO sector data
+- Bloomberg benchmarks (from knowledge base documents)
+"""
+
+import json
+import re
+from agents.base import BaseAgent
+from workflow.state import DealState
+
+
+class MarketIntelAgent(BaseAgent):
+
+    name = "market_intel"
+
+    system_prompt = """You are a market intelligence analyst specialising in Vietnam's
+structured finance and capital markets, working at Techcombank CIBG.
+
+Your role is to provide macro and sector context for credit decisions.
+
+Standards you must follow:
+- Distinguish Fact (sourced), Inference (reasoned from facts), and Opinion (judgement)
+- Always name the source alongside any figure (e.g. "SBV Circular 02/2023")
+- Flag data that may be stale: Vietnamese macro data typically lags 1–2 quarters
+- Note where Western financial frameworks may not map cleanly to Vietnam's market
+- If you don't have current data, say so explicitly — do not fabricate figures
+- All figures should reference approximate date of data (e.g. "as of Q3 2024")
+"""
+
+    def analyse_market_context(self, parsed_terms: dict) -> dict:
+        """Generate market and sector context for the deal."""
+
+        borrower = parsed_terms.get("borrower", "Unknown borrower")
+        sector = parsed_terms.get("borrower_type", "Unknown sector")
+        facility_type = parsed_terms.get("facility_type", "Unknown facility")
+        amount = parsed_terms.get("amount", "Unknown")
+        currency = parsed_terms.get("currency", "Unknown")
+        purpose = parsed_terms.get("purpose", "Unknown")
+
+        prompt = f"""Provide market intelligence for this deal. Be explicit about data sources and dates.
+
+DEAL SUMMARY:
+- Borrower: {borrower} ({sector})
+- Facility: {facility_type} — {amount} {currency}
+- Purpose: {purpose}
+
+Provide a JSON response with exactly these keys:
+
+{{
+  "sector_overview": {{
+    "sector_name": "name of the borrower's industry sector",
+    "sector_outlook": "brief 2-3 sentence assessment",
+    "key_risks": ["risk 1", "risk 2", "risk 3"],
+    "key_tailwinds": ["tailwind 1", "tailwind 2"],
+    "data_source": "source name and approximate date"
+  }},
+  "benchmark_rates": {{
+    "sbv_refinancing_rate": "rate + source + date",
+    "typical_lending_spread_vnd": "range for this credit tier",
+    "usd_benchmark": "SOFR or equivalent if USD deal",
+    "corporate_bond_market": "brief note on VN corporate bond market conditions",
+    "data_source": "source and date — flag if stale"
+  }},
+  "comparable_deals": [
+    {{
+      "description": "comparable deal description",
+      "amount": "size",
+      "pricing": "rate",
+      "source": "where this data is from",
+      "reliability": "high / medium / low"
+    }}
+  ],
+  "sbv_policy_context": "Key SBV policies relevant to this facility type (name Circulars/Decisions specifically)",
+  "macro_risks": [
+    {{
+      "risk": "risk description",
+      "severity": "HIGH / MEDIUM / LOW",
+      "mitigation": "how the deal structure could address this"
+    }}
+  ],
+  "data_quality_notes": "Any caveats on data freshness, methodology, or gaps"
+}}
+
+Respond with JSON only. Label every figure with its source."""
+
+        response = self.call_llm(prompt)
+
+        try:
+            cleaned = re.sub(r"```(?:json)?\n?", "", response).replace("```", "").strip()
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            return {
+                "raw_analysis": response,
+                "parse_error": "Response was not valid JSON",
+                "data_quality_notes": "Extraction failed — review raw_analysis"
+            }
+
+    def run(self, state: DealState) -> dict:
+        print(f"[Market Intel] Analysing sector and macro context...")
+
+        if not state.parsed_terms:
+            state.add_error("market_intel", "No parsed terms available — Ingestion must run first")
+            state.mark_complete("market_intel")
+            return state.dict()
+
+        context = self.analyse_market_context(state.parsed_terms)
+        state.market_context = context
+        state.mark_complete("market_intel")
+        print(f"[Market Intel] Complete")
+
+        return state.dict()
+
+
+_agent = MarketIntelAgent()
+
+def run_market_intel_agent(state: DealState) -> dict:
+    return _agent.run(state)

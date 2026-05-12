@@ -1,0 +1,129 @@
+"""
+Mandatory quality gate before final output.
+"""
+
+import json
+import re
+from typing import Literal
+from agents.base import BaseAgent
+from workflow.state import DealState
+from prompts.brand_guardrails import BRAND_GUARDRAILS, QUALITY_GATE_SCHEMA
+from prompts.audience_profiles import AUDIENCE_PROFILES
+
+
+NextAfterAdvisor = Literal["memo_architect", "END"]
+
+
+class SeniorAdvisorAgent(BaseAgent):
+    name = "senior_advisor"
+
+    system_prompt = f"""You are the Senior Advisor Controller.
+You challenge output quality before anything reaches stakeholders.
+
+{BRAND_GUARDRAILS}
+
+Gatekeeping policy:
+- APPROVE: only if output is stakeholder-ready now.
+- REVISE: quality/issues fixable in one rewrite.
+- ESCALATE_TO_HUMAN: unresolved legal/regulatory uncertainty, material contradictions,
+  or high-stakes uncertainty that must not be auto-sent.
+"""
+
+    def review(self, state: DealState) -> dict:
+        audience_key = (state.audience or "credit_committee").strip().lower().replace(" ", "_")
+        profile = AUDIENCE_PROFILES.get(audience_key, AUDIENCE_PROFILES["credit_committee"])
+
+        prompt = f"""Review this draft for release readiness.
+
+AUDIENCE PROFILE:
+{json.dumps(profile, indent=2)}
+
+PARSED TERMS:
+{json.dumps(state.parsed_terms, indent=2)}
+
+COMPLIANCE FLAGS:
+{json.dumps(state.compliance_flags, indent=2)}
+
+DRAFT OUTPUT:
+{state.draft_memo}
+
+Assess:
+1) Data coherence and internal consistency
+2) Factual discipline and claim quality
+3) Brand/style compliance
+4) Audience fit
+5) Decision usefulness
+
+{QUALITY_GATE_SCHEMA}
+"""
+        resp = self.call_llm(prompt)
+        cleaned = re.sub(r"```(?:json)?\n?", "", resp).replace("```", "").strip()
+        try:
+            data = json.loads(cleaned)
+        except Exception:
+            data = {
+                "decision": "REVISE",
+                "quality_score": 40,
+                "issues": [{
+                    "category": "structure",
+                    "severity": "HIGH",
+                    "issue": "Senior advisor JSON parse failed; output quality uncertain.",
+                    "action": "Rewrite with tighter structure and explicit recommendation."
+                }],
+                "executive_feedback": "Rewrite with stricter structure and auditable claims.",
+                "must_fix_before_send": ["Ensure clean, executive format and coherent claims."]
+            }
+        return data
+
+    def run(self, state: DealState) -> dict:
+        if not state.draft_memo.strip():
+            state.quality_gate_decision = "ESCALATE_TO_HUMAN"
+            state.quality_gate_notes = [{"category": "structure", "severity": "HIGH", "issue": "No draft to review", "action": "Run memo_architect first"}]
+            state.advisor_feedback = "No draft available for quality review."
+            state.mark_complete("senior_advisor")
+            return state.dict()
+
+        result = self.review(state)
+        decision = str(result.get("decision", "REVISE")).upper().strip()
+        if decision not in {"APPROVE", "REVISE", "ESCALATE_TO_HUMAN"}:
+            decision = "REVISE"
+
+        if decision == "REVISE" and state.revision_count >= state.max_revisions:
+            decision = "ESCALATE_TO_HUMAN"
+            extra = {
+                "category": "risk",
+                "severity": "HIGH",
+                "issue": "Max auto-revision reached.",
+                "action": "Manual review required before external sharing."
+            }
+            issues = result.get("issues", [])
+            issues.append(extra)
+            result["issues"] = issues
+
+        state.quality_gate_decision = decision
+        try:
+            state.quality_score = int(result.get("quality_score", 0))
+        except Exception:
+            state.quality_score = 0
+        state.quality_gate_notes = result.get("issues", [])
+        state.advisor_feedback = result.get("executive_feedback", "")
+
+        if decision == "REVISE":
+            state.revision_count += 1
+            if "memo_architect" in state.completed_steps:
+                state.completed_steps.remove("memo_architect")
+
+        state.mark_complete("senior_advisor")
+        print(f"[Senior Advisor] Decision: {state.quality_gate_decision} | Score: {state.quality_score} | Revisions: {state.revision_count}/{state.max_revisions}")
+        return state.dict()
+
+
+_agent = SeniorAdvisorAgent()
+
+def run_senior_advisor_agent(state: DealState) -> dict:
+    return _agent.run(state)
+
+def route_after_senior_advisor(state: DealState) -> NextAfterAdvisor:
+    if state.quality_gate_decision == "REVISE":
+        return "memo_architect"
+    return "END"

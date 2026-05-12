@@ -1,0 +1,102 @@
+"""
+workflow/graph.py — Wires all agents into the LangGraph pipeline
+
+This is where the system comes together. It:
+  1. Creates the state graph
+  2. Adds each agent as a node
+  3. Connects them with edges (routing rules)
+  4. Compiles into a runnable pipeline
+
+To run the full pipeline:
+    from workflow.graph import build_graph
+    pipeline = build_graph()
+    result = pipeline.invoke({"input_text": "...", "messages": []})
+"""
+
+from langgraph.graph import StateGraph, END
+from workflow.state import DealState
+from workflow.supervisor import supervisor_node, route_after_supervisor
+
+# Import all agent runner functions
+from agents.ingestion import run_ingestion_agent
+from agents.market_intel import run_market_intel_agent
+from agents.financial_modeler import run_financial_modeler_agent
+from agents.compliance import run_compliance_agent
+from agents.memo_architect import run_memo_architect_agent
+
+
+def build_graph():
+    """
+    Constructs and compiles the full SF agent pipeline.
+
+    Graph structure:
+        START → supervisor → [ingestion | market_intel | financial_modeler
+                              | compliance | memo_architect] → supervisor → ...
+                                                                          → END
+
+    Each agent completes, then control returns to supervisor for re-routing.
+    """
+
+    # Create the graph with our state schema
+    graph = StateGraph(DealState)
+
+    # ── Add nodes (each node = one agent or the supervisor) ──────────────────
+    graph.add_node("supervisor", supervisor_node)
+    graph.add_node("ingestion", run_ingestion_agent)
+    graph.add_node("market_intel", run_market_intel_agent)
+    graph.add_node("financial_modeler", run_financial_modeler_agent)
+    graph.add_node("compliance", run_compliance_agent)
+    graph.add_node("memo_architect", run_memo_architect_agent)
+
+    # ── Entry point ───────────────────────────────────────────────────────────
+    graph.set_entry_point("supervisor")
+
+    # ── Supervisor decides where to go next ───────────────────────────────────
+    graph.add_conditional_edges(
+        "supervisor",                   # From this node...
+        route_after_supervisor,         # ...call this function to decide...
+        {                               # ...and map the result to a node:
+            "ingestion":         "ingestion",
+            "market_intel":      "market_intel",
+            "financial_modeler": "financial_modeler",
+            "compliance":        "compliance",
+            "memo_architect":    "memo_architect",
+            "END":               END,
+        }
+    )
+
+    # ── After each agent, always return to supervisor ─────────────────────────
+    for agent_name in ["ingestion", "market_intel", "financial_modeler",
+                       "compliance", "memo_architect"]:
+        graph.add_edge(agent_name, "supervisor")
+
+    # ── Compile and return ────────────────────────────────────────────────────
+    return graph.compile()
+
+
+def run_pipeline(input_text: str, file_path: str = None) -> DealState:
+    """
+    Convenience function to run the full pipeline on a deal.
+
+    Args:
+        input_text: Term sheet text (paste directly or extracted from PDF)
+        file_path:  Optional path to the source file
+
+    Returns:
+        Final DealState with draft_memo populated
+    """
+    pipeline = build_graph()
+
+    initial_state = {
+        "input_text": input_text,
+        "input_file_path": file_path,
+        "messages": [],
+        "completed_steps": [],
+        "errors": [],
+    }
+
+    print("[Pipeline] Starting SF Agentic AI pipeline...")
+    final_state = pipeline.invoke(initial_state)
+    print("[Pipeline] Complete.")
+
+    return DealState(**final_state)

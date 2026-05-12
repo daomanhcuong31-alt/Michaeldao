@@ -1,0 +1,33 @@
+from config import llm
+from workflow.state import DealState
+
+class BaseAgent:
+    name: str = "base"
+    system_prompt: str = "You are a helpful assistant."
+
+    def call_llm(self, user_message: str, system_override: str = None) -> str:
+        system = system_override or self.system_prompt
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_message},
+        ]
+        try:
+            response = llm.invoke(messages)
+            content = getattr(response, "content", "")
+            if isinstance(content, list):
+                parts = []
+                for c in content:
+                    if isinstance(c, dict):
+                        parts.append(str(c.get("text", "")))
+                    else:
+                        parts.append(str(c))
+                content = "\n".join(p for p in parts if p).strip()
+            else:
+                content = str(content).strip()
+            return content
+        except Exception as e:
+            print(f"[{self.name}] LLM call failed: {e}")
+            return f"ERROR: {e}"
+
+    def run(self, state: DealState) -> dict:
+        raise NotImplementedError(f"{self.name} must implement run()")

@@ -1,0 +1,147 @@
+"""
+tools/ocr.py — PDF and document text extraction
+
+Extracts text from PDFs so the Ingestion agent can read them.
+Uses pdfplumber for native PDFs (born-digital) and pytesseract
+for scanned/image-based PDFs.
+
+Both tools run 100% locally on your Mac — no cloud, no API keys.
+
+Usage:
+    from tools.ocr import extract_text_from_pdf
+    text = extract_text_from_pdf("./data/uploads/term_sheet.pdf")
+"""
+
+import os
+from pathlib import Path
+from typing import Optional
+
+
+def extract_text_from_pdf(file_path: str) -> dict:
+    """
+    Extract text from a PDF file.
+
+    Tries pdfplumber first (fast, accurate for born-digital PDFs).
+    Falls back to pytesseract OCR if the PDF appears to be scanned.
+
+    Args:
+        file_path: Path to the PDF file
+
+    Returns:
+        dict with:
+          - text: extracted text (str)
+          - pages: number of pages
+          - method: "pdfplumber" or "ocr"
+          - quality: "GOOD" / "PARTIAL" / "POOR"
+          - warnings: list of any issues encountered
+    """
+    result = {
+        "text": "",
+        "pages": 0,
+        "method": None,
+        "quality": None,
+        "warnings": []
+    }
+
+    path = Path(file_path)
+    if not path.exists():
+        result["warnings"].append(f"File not found: {file_path}")
+        result["quality"] = "FAILED"
+        return result
+
+    if path.suffix.lower() != ".pdf":
+        # Try reading as plain text
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                result["text"] = f.read()
+            result["method"] = "plain_text"
+            result["quality"] = "GOOD"
+            result["pages"] = 1
+            return result
+        except Exception as e:
+            result["warnings"].append(f"Not a PDF and could not read as text: {e}")
+            result["quality"] = "FAILED"
+            return result
+
+    # ── Try pdfplumber first ──────────────────────────────────────────────────
+    try:
+        import pdfplumber
+
+        full_text = []
+        with pdfplumber.open(file_path) as pdf:
+            result["pages"] = len(pdf.pages)
+            for i, page in enumerate(pdf.pages):
+                page_text = page.extract_text()
+                if page_text:
+                    full_text.append(page_text)
+                else:
+                    result["warnings"].append(f"Page {i+1}: no text extracted (may be image/scanned)")
+
+        if full_text:
+            result["text"] = "\n\n".join(full_text)
+            result["method"] = "pdfplumber"
+
+            # Assess quality by text density
+            chars_per_page = len(result["text"]) / max(result["pages"], 1)
+            if chars_per_page > 200:
+                result["quality"] = "GOOD"
+            elif chars_per_page > 50:
+                result["quality"] = "PARTIAL"
+                result["warnings"].append("Low text density — document may be partially scanned")
+            else:
+                result["quality"] = "POOR"
+                result["warnings"].append(
+                    "Very little text extracted — document is likely fully scanned. "
+                    "Try OCR: set use_ocr=True in extract_text_from_pdf()"
+                )
+            return result
+
+    except ImportError:
+        result["warnings"].append("pdfplumber not installed — run: pip install pdfplumber")
+    except Exception as e:
+        result["warnings"].append(f"pdfplumber failed: {e}")
+
+    # ── Fall back to OCR ──────────────────────────────────────────────────────
+    try:
+        import pytesseract
+        from pdf2image import convert_from_path
+        from PIL import Image
+
+        result["warnings"].append("Falling back to OCR (slower, for scanned documents)")
+        images = convert_from_path(file_path)
+        result["pages"] = len(images)
+
+        ocr_text = []
+        for i, image in enumerate(images):
+            text = pytesseract.image_to_string(image, lang="eng")
+            if text.strip():
+                ocr_text.append(text)
+            else:
+                result["warnings"].append(f"OCR page {i+1}: no text detected")
+
+        result["text"] = "\n\n".join(ocr_text)
+        result["method"] = "ocr"
+        result["quality"] = "PARTIAL" if ocr_text else "POOR"
+
+    except ImportError as e:
+        result["warnings"].append(f"OCR libraries not available: {e}. Install: pip install pytesseract pdf2image")
+        result["quality"] = "FAILED"
+    except Exception as e:
+        result["warnings"].append(f"OCR failed: {e}")
+        result["quality"] = "FAILED"
+
+    return result
+
+
+def extract_text_from_string(text: str) -> dict:
+    """
+    Wrap plain text in the same return format as extract_text_from_pdf().
+    Used when the user pastes a term sheet directly.
+    """
+    return {
+        "text": text.strip(),
+        "pages": 1,
+        "method": "direct_input",
+        "quality": "GOOD" if text.strip() else "EMPTY",
+        "warnings": [] if text.strip() else ["Empty input provided"]
+    }

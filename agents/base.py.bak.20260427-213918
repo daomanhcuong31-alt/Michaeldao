@@ -1,0 +1,49 @@
+"""
+agents/base.py — Base class that all agents inherit from
+
+This provides the shared LLM call logic so each agent just needs to
+define its own system prompt and parsing logic.
+"""
+
+from config import llm, settings
+from workflow.state import DealState
+
+
+class BaseAgent:
+    """
+    Parent class for all SF agents.
+    Handles LLM communication so subclasses just define:
+      - name: str
+      - system_prompt: str
+      - run(state): method that does the actual work
+    """
+
+    name: str = "base"
+    system_prompt: str = "You are a helpful assistant."
+
+    def call_llm(self, user_message: str, system_override: str = None) -> str:
+        """
+        Send a message to the LM Studio model and return the response text.
+
+        Args:
+            user_message:    The prompt to send
+            system_override: Use a different system prompt just for this call
+
+        Returns:
+            Model response as a string
+        """
+        system = system_override or self.system_prompt
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_message},
+        ]
+        try:
+            response = llm.invoke(messages)
+            return response.content.strip()
+        except Exception as e:
+            print(f"[{self.name}] LLM call failed: {e}")
+            return f"ERROR: {e}"
+
+    def run(self, state: DealState) -> dict:
+        """Override this in each subclass."""
+        raise NotImplementedError(f"{self.name} must implement run()")

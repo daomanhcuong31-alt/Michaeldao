@@ -1,0 +1,16 @@
+.git
+.gitignore
+.pytest_cache
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.bak.*
+.DS_Store
+
+data/output/*
+data/chroma_db/*
+data/api/*
+data/inbox/*
+

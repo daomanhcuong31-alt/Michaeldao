@@ -1,0 +1,167 @@
+"""
+agents/ingestion.py — Robust Ingestion Agent
+"""
+
+import json
+import re
+from typing import Dict, Any
+from agents.base import BaseAgent
+from workflow.state import DealState
+
+REQUIRED_FIELDS = {
+    "borrower": "[NOT PROVIDED]",
+    "borrower_type": "[NOT PROVIDED]",
+    "facility_type": "[NOT PROVIDED]",
+    "amount": "[NOT PROVIDED]",
+    "currency": "[NOT PROVIDED]",
+    "tenor": "[NOT PROVIDED]",
+    "pricing": "[NOT PROVIDED]",
+    "pricing_basis": "[NOT PROVIDED]",
+    "security": "[NOT PROVIDED]",
+    "security_value": "[NOT PROVIDED]",
+    "purpose": "[NOT PROVIDED]",
+    "repayment_schedule": "[NOT PROVIDED]",
+    "covenants": [],
+    "conditions_precedent": [],
+    "governing_law": "[NOT PROVIDED]",
+    "accounting_standard": "[NOT PROVIDED]",
+    "deal_parties": {
+        "mandated_lead_arranger": "[NOT PROVIDED]",
+        "facility_agent": "[NOT PROVIDED]",
+        "security_agent": "[NOT PROVIDED]",
+    },
+    "key_dates": {
+        "signing_date": "[NOT PROVIDED]",
+        "availability_period": "[NOT PROVIDED]",
+        "maturity_date": "[NOT PROVIDED]",
+    },
+    "missing_or_unclear": [],
+}
+
+class IngestionAgent(BaseAgent):
+    name = "ingestion"
+
+    system_prompt = """You are a structured finance ingestion analyst.
+Return strict JSON only. No markdown, no explanation.
+If unknown, use [NOT PROVIDED]. Never invent numbers."""
+
+    def _extract_json_block(self, text: str) -> str:
+        cleaned = re.sub(r"```(?:json)?\n?", "", text).replace("```", "").strip()
+        if cleaned.startswith("{") and cleaned.endswith("}"):
+            return cleaned
+        # Find largest JSON-like block
+        matches = re.findall(r"\{[\s\S]*\}", cleaned)
+        if matches:
+            matches.sort(key=len, reverse=True)
+            return matches[0]
+        return cleaned
+
+    def _safe_json_parse(self, text: str):
+        try:
+            return json.loads(self._extract_json_block(text))
+        except Exception:
+            return None
+
+    def _normalize(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        out = dict(REQUIRED_FIELDS)
+        out["deal_parties"] = dict(REQUIRED_FIELDS["deal_parties"])
+        out["key_dates"] = dict(REQUIRED_FIELDS["key_dates"])
+        if not isinstance(data, dict):
+            return out
+
+        for k, v in data.items():
+            if k in {"deal_parties", "key_dates"} and isinstance(v, dict):
+                out[k].update(v)
+            elif k in out:
+                out[k] = v
+
+        if not isinstance(out.get("covenants"), list):
+            out["covenants"] = [str(out["covenants"])] if out.get("covenants") else []
+        if not isinstance(out.get("conditions_precedent"), list):
+            out["conditions_precedent"] = [str(out["conditions_precedent"])] if out.get("conditions_precedent") else []
+        if not isinstance(out.get("missing_or_unclear"), list):
+            out["missing_or_unclear"] = [str(out["missing_or_unclear"])] if out.get("missing_or_unclear") else []
+        return out
+
+    def _heuristic_extract(self, raw_text: str) -> Dict[str, Any]:
+        t = raw_text
+
+        def pick(patterns, default="[NOT PROVIDED]"):
+            for p in patterns:
+                m = re.search(p, t, flags=re.IGNORECASE)
+                if m:
+                    return m.group(1).strip()
+            return default
+
+        out = self._normalize({})
+        out["borrower"] = pick([r"Borrower:\s*(.+?)(?:\n|$)", r"Obligor:\s*(.+?)(?:\n|$)"])
+        out["facility_type"] = pick([r"Facility Type:\s*(.+?)(?:\n|$)", r"Facility:\s*(.+?)(?:\n|$)"])
+        out["amount"] = pick([r"Amount:\s*([A-Z]{0,3}\s?[\d,\.]+)", r"Facility Amount:\s*([A-Z]{0,3}\s?[\d,\.]+)"])
+        out["currency"] = pick([r"Currency:\s*([A-Z]{3})", r"\b(USD|VND|EUR|SGD)\b"])
+        out["tenor"] = pick([r"Tenor:\s*(.+?)(?:\n|$)", r"Maturity:\s*(.+?)(?:\n|$)"])
+        out["pricing"] = pick([r"Pricing:\s*(.+?)(?:\n|$)", r"Interest(?: Rate)?:\s*(.+?)(?:\n|$)"])
+        out["pricing_basis"] = pick([r"Pricing Basis:\s*(.+?)(?:\n|$)"])
+        out["purpose"] = pick([r"Purpose:\s*(.+?)(?:\n|$)"])
+        out["repayment_schedule"] = pick([r"Repayment:\s*(.+?)(?:\n|$)"])
+        out["security"] = pick([r"Security:\s*([\s\S]+?)(?:Covenants:|Conditions Precedent:|Governing Law:|$)"])
+        out["governing_law"] = pick([r"Governing Law:\s*(.+?)(?:\n|$)"])
+        out["accounting_standard"] = pick([r"Accounting Standard:\s*(.+?)(?:\n|$)"])
+
+        cov = re.findall(r"-\s*(.+)", re.search(r"Covenants:\s*([\s\S]+?)(?:Conditions Precedent:|Governing Law:|$)", t, re.IGNORECASE).group(1)) if re.search(r"Covenants:\s*", t, re.IGNORECASE) else []
+        cp = re.findall(r"-\s*(.+)", re.search(r"Conditions Precedent:\s*([\s\S]+?)(?:Governing Law:|$)", t, re.IGNORECASE).group(1)) if re.search(r"Conditions Precedent:\s*", t, re.IGNORECASE) else []
+        out["covenants"] = cov
+        out["conditions_precedent"] = cp
+
+        missing = []
+        for k, v in out.items():
+            if isinstance(v, str) and (v == "[NOT PROVIDED]" or not v.strip()):
+                missing.append(k)
+        out["missing_or_unclear"] = missing
+        out["_ingestion_method"] = "heuristic_fallback"
+        return out
+
+    def extract_terms(self, raw_text: str) -> dict:
+        prompt = f"""Extract deal terms into STRICT JSON with these keys only:
+{json.dumps(REQUIRED_FIELDS, ensure_ascii=False, indent=2)}
+Document:
+{raw_text}
+Return JSON only."""
+        response = self.call_llm(prompt)
+        parsed = self._safe_json_parse(response)
+
+        if parsed is None:
+            repair_prompt = f"""Convert this to valid JSON with exact schema keys. JSON only.
+Schema:
+{json.dumps(REQUIRED_FIELDS, ensure_ascii=False)}
+Text:
+{response}"""
+            repaired = self.call_llm(repair_prompt)
+            parsed = self._safe_json_parse(repaired)
+
+        if parsed is None:
+            print("[Ingestion] JSON parse failed, using heuristic extractor")
+            return self._heuristic_extract(raw_text)
+
+        normalized = self._normalize(parsed)
+        normalized["_ingestion_method"] = "llm_json"
+        return normalized
+
+    def run(self, state: DealState) -> dict:
+        print(f"[Ingestion] Processing document ({len(state.input_text)} chars)...")
+        if not state.input_text.strip():
+            state.add_error("ingestion", "No input text provided")
+            state.mark_complete("ingestion")
+            return state.dict()
+
+        raw_text = state.input_text.strip()
+        parsed = self.extract_terms(raw_text)
+
+        print(f"[Ingestion] Extracted {len(parsed)} top-level fields")
+        state.raw_text = raw_text
+        state.parsed_terms = parsed
+        state.mark_complete("ingestion")
+        return state.dict()
+
+_agent = IngestionAgent()
+def run_ingestion_agent(state: DealState) -> dict:
+    return _agent.run(state)

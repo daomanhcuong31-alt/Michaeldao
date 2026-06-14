@@ -13,6 +13,7 @@
 - **Organization:** TCB (Techcombank) — Structured Finance division
 - **Location:** Vietnam
 - **Primary language:** Vietnamese (work context), English (code + AI instructions)
+- **Telegram:** Manh Cuong (Hermes AI assistant connected via Telegram DM)
 
 ---
 
@@ -71,6 +72,7 @@ When resuming work, read these in order:
 4. **`HANDOFF_20260430.md`** — Detailed last-session handoff.
 5. **`README.md`** — System overview and quick-run examples.
 6. **`ROADMAP.md`** — Build phases and project folder structure.
+7. **`SYSTEM_CONTRACT.md`** — Architecture contract, API shapes, data model.
 
 ---
 
@@ -81,7 +83,7 @@ When resuming work, read these in order:
 | Claude (Anthropic) | Primary coding agent, architecture decisions |
 | Gemini CLI | Session work on supervisor logic, UI stabilization |
 | Codex (OpenAI) | Backend/UI hardening sessions |
-| Hermes (Nous Research) | My personal AI assistant via Telegram |
+| Hermes (Nous Research) | My personal AI assistant via Telegram — daily driver, repo access |
 
 ---
 
@@ -93,6 +95,8 @@ When resuming work, read these in order:
 - **Write handoff notes** at the end of each session (`SESSION_LOG.md`)
 - **No cloud, no leaks** — all processing must stay local unless I explicitly say otherwise
 - **Keep existing tests passing** — never break the test suite without telling me
+- **Show real output** — don't summarize tool results without showing evidence
+- **Be direct and concise** — bullet points, no lengthy preambles, no fluff
 
 ### Communication style:
 - Be **direct and concise** — no fluff, no lengthy preambles
@@ -112,7 +116,7 @@ When resuming work, read these in order:
 
 - **Backend:** FastAPI on `127.0.0.1:8000` ✅
 - **LM Studio:** `http://localhost:1234/v1` — model `qwen/qwen3.5-9b`
-- **Tests:** 39 passing ✅
+- **Tests:** 39+ passing ✅
 - **Autonomous inbox:** Configured ✅
 - **UI:** React frontend, MD output format as default ✅
 
@@ -121,12 +125,53 @@ When resuming work, read these in order:
 - `memo_plus_distribution` — memo + investor suitability + distribution advisory
 - `memo_plus_holdbook` — memo + operations implementation plan
 - `full_e2e` — all paths, full sequence
+- `analysis_brief` — non-credit, analysis output
+- `ops_sop` — Standard Operating Procedure output
+- `meeting_minutes` — Meeting minutes output
+- `pipeline_report` — Pipeline report output
+- `market_intel` — Market intelligence output
+- `data_analysis` — Data analysis output
 
 ### Supported audience templates:
 - `credit_committee`
 - `ceo`
 - `chief_cibg`
 - `external_client`
+
+### Controller Rubric (Senior Advisor):
+- **APPROVE:** all dimensions >= 7 and total >= 38
+- **REVISE:** all dimensions >= 5 and total >= 28
+- **ESCALATE_TO_HUMAN:** otherwise
+- Dimensions: factual coherence, legal consistency, financial completeness, audience-fit, actionability
+
+---
+
+## 🔄 SF Agentic AI — Core Data Flow
+
+```
+User uploads/drops file
+        ↓
+  Ingestion Agent  (normalizes text from PDF/txt)
+        ↓
+  Supervisor Node  (plans which workers to run based on intent)
+        ↓
+  ┌─────────────────────────────────┐  (parallel)
+  │  Market Intel  │  Compliance  │  Financial Modeler  │
+  └─────────────────────────────────┘
+        ↓
+  Memo Architect   (synthesizes output, credit memo or other family)
+        ↓
+  Senior Advisor   (rubric-based review: APPROVE / REVISE / ESCALATE)
+        ↓
+  Human Gate       (approve / revise / stop)
+        ↓
+  Post-Credit Branching:
+    - Distribution path (investor suitability + distribution advisory)
+    - Holdbook path (operations implementation plan)
+    - Full E2E (both)
+        ↓
+  Artifact saved to data/output  →  UI download
+```
 
 ---
 
@@ -159,7 +204,16 @@ PYTHONPYCACHEPREFIX=/tmp/pycache ./.venv/bin/python -m pytest
 - When I say "push to GitHub", push to the `Michaeldao` repo (this one)
 - I may use different AI agents across sessions — read `SESSION_LOG.md` to see who did what
 - My PAT rotates — if auth fails, ask me for a new one
+- **Hermes** can clone this repo at any time using my GitHub PAT to catch up on context
 
 ---
 
-*Last updated: 2026-06-14*
+## 🗓️ Session History (Hermes)
+
+| Date | Agent | Summary |
+|------|-------|---------|
+| 2026-06-14 | Hermes | First connected to repo via GitHub PAT. Read ABOUT_ME, SESSION_LOG, PROJECT_HANDOFF, SYSTEM_CONTRACT. Updated ABOUT_ME with richer context. |
+
+---
+
+*Last updated: 2026-06-14 by Hermes Agent*

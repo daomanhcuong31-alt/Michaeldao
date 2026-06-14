@@ -3,6 +3,7 @@
 
 # ── Core LLM & Agent Framework ──────────────────────────────────────────────
 openai>=1.30.0              # Talks to LM Studio's OpenAI-compatible server
+anthropic>=0.40.0           # Anthropic SDK — required for prompt caching (cache_control)
 langgraph>=0.2.0            # Agent graph orchestration (Manager-Worker model)
 langchain>=0.2.0            # Base utilities for LangGraph
 langchain-openai>=0.1.0     # LangChain adapter for OpenAI-compatible endpoints

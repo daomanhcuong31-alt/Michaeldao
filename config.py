@@ -1,5 +1,10 @@
 """
-config.py - Central configuration and LM Studio / Perplexity setup
+config.py - Central configuration and LM Studio / Anthropic / Perplexity setup
+
+Supported LLM_PROVIDER values:
+  lm_studio   — default, local LM Studio (OpenAI-compatible)
+  anthropic   — Anthropic Claude with prompt caching (cache_control)
+  hermes      — Hermes gateway runtime
 """
 
 import os
@@ -24,6 +29,11 @@ class Settings:
     base_url: str = os.getenv("LM_STUDIO_BASE_URL", "http://localhost:1234/v1")
     api_key: str = os.getenv("LM_STUDIO_API_KEY", "lm-studio")
     model: str = os.getenv("LM_STUDIO_MODEL", "local-model")
+
+    # Anthropic (prompt caching)
+    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
+    anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
+    anthropic_cache_ttl: int = int(os.getenv("ANTHROPIC_CACHE_TTL_MINUTES", "5"))
 
     # LLM behavior
     temperature: float = float(os.getenv("LLM_TEMPERATURE", "0.1"))
@@ -51,6 +61,10 @@ if settings.llm_provider == "hermes":
     settings.base_url = os.getenv("HERMES_BASE_URL", "http://127.0.0.1:18789")
     settings.api_key = os.getenv("HERMES_API_KEY", "hermes")
     settings.model = os.getenv("HERMES_MODEL", "lmstudio/qwen/qwen3.5-9b")
+
+# Anthropic provider — model name comes from anthropic_model, not LM_STUDIO_MODEL
+if settings.llm_provider == "anthropic":
+    settings.model = settings.anthropic_model
 
 raw_client = OpenAI(
     base_url=settings.base_url,

@@ -1,198 +1,165 @@
-# About Me — Manh Cuong (Dao Manh Cuong)
+# About Me — Michael Dao (Manh Cuong)
 
-> **Purpose:** This file is a persistent knowledge base for AI agents (Hermes, Claude, Gemini, Codex, etc.)
-> working with me. Load this file at the start of every session to understand who I am, what I'm building,
-> and how I like to work.
+> This file is my personal knowledge base for AI agents (Hermes, Claude, Gemini, Codex, etc.).
+> Read this first to understand who I am, what I'm building, and how I prefer to work.
 
 ---
 
 ## 👤 Identity
 
-- **Name:** Dao Manh Cuong
+- **Name:** Dao Manh Cuong (Michael Dao)
 - **GitHub:** [@daomanhcuong31-alt](https://github.com/daomanhcuong31-alt)
+- **Profession:** Finance professional / AI builder
+- **Organization:** TCB (Techcombank) — Structured Finance division
 - **Location:** Vietnam
-- **Language:** Vietnamese (native), English (working)
-- **Role:** Finance professional / AI builder at TCB (Techcombank), focused on Structured Finance
+- **Primary language:** Vietnamese (work context), English (code + AI instructions)
 
 ---
 
-## 🧠 What I'm Building
+## 🎯 What I'm Building
 
 ### SF Agentic AI
-A **production-grade, autonomous multi-agent AI system** that automates credit memo drafting for
-Techcombank's Structured Finance (SF) team.
+A **production-grade, autonomous multi-agent AI system** that automates Structured Finance credit memo drafting for TCB.
+
+**Business goal:** Support FY2026 USD $8M TOI pipeline with faster, more consistent credit analysis.
 
 **What it does:**
-1. Reads deal term sheets (PDF or text)
-2. Pulls market benchmarks and regulatory flags
-3. Models financial structures (waterfall, DSCR)
+1. Ingests deal term sheets (PDF or text)
+2. Pulls market benchmarks and regulatory flags (SBV, HNX)
+3. Models financial structure (DSCR, waterfall, stress tests)
 4. Checks compliance against SBV circulars and Vietnamese law
 5. Writes credit committee memos in TCB tone
-6. Distributes to appropriate audiences (credit committee, CEO, chief CIBG, external client)
+6. Routes for distribution (investor suitability) or holdbook (ops plan)
 
-**Business goal:** Support FY2026 USD **$8M TOI pipeline**
-
-**Key design principle:** 100% local — no data leaves my Mac. Uses LM Studio for inference.
+**Key design principles:**
+- 100% local — no data leaves my machine
+- LM Studio as the LLM runtime (currently `qwen/qwen3.5-9b`)
+- Python + LangGraph for agent orchestration
+- FastAPI backend + custom React UI
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Layer | Tool |
-|---|---|
-| Language | Python 3 |
-| Agent framework | LangGraph (manager-worker) |
-| LLM runtime | LM Studio (local) |
-| Model | `qwen/qwen3.5-9b` (default) |
-| Backend API | FastAPI (`127.0.0.1:8000`) |
-| Frontend | React (custom "Claude UI") |
+| Layer | Technology |
+|-------|-----------|
+| Agent orchestration | LangGraph (Python) |
+| LLM runtime | LM Studio (local) — Qwen3.5-9B / Gemma 4 |
+| Backend API | FastAPI on `127.0.0.1:8000` |
+| Frontend | React (Claude UI) |
 | File intake | Local inbox folder + Google Drive sync |
-| Tests | pytest (39+ tests) |
+| Storage | Local filesystem (`data/output`, `data/api`, `data/local`) |
+| Testing | pytest (39+ tests) |
 
 ---
 
-## 🗂️ Project Structure
+## 📁 Project Location
 
-**Repo (local Mac path):**
-```
-/Users/daomanhcuong/Documents/AI_Works/Claude Projects/Automation/Hermes/sf-agentic-ai
-```
-
-**Key files:**
-- `main.py` — CLI entry point, supports `--autonomous`, `--intent`, `--audience`
-- `workflow/supervisor.py` — manager-worker routing logic
-- `workflow/intent_router.py` — maps intents to agent sequences
-- `workflow/graph.py` — LangGraph state graph
-- `workflow/state.py` — shared pipeline state
-- `tools/inbox_worker.py` — autonomous file watcher
-- `backend/api.py` — FastAPI backend
-- `backend/static/claude-ui/` — React UI
-
-**Inbox folders (Google Drive):**
-- Pending: `/Users/daomanhcuong/My Drive/SF Agentic Inbox/pending`
-- Processing: `/Users/daomanhcuong/My Drive/SF Agentic Inbox/processing`
-- Archive: `/Users/daomanhcuong/My Drive/SF Agentic Inbox/archive`
-- Failed: `/Users/daomanhcuong/My Drive/SF Agentic Inbox/failed`
+- **Repo (knowledge base):** `https://github.com/daomanhcuong31-alt/Michaeldao`
+- **Local project path (Mac):** `/Users/daomanhcuong/Documents/AI_Works/Claude Projects/Automation/Hermes/sf-agentic-ai`
+- **Google Drive inbox:** `/Users/daomanhcuong/My Drive/SF Agentic Inbox/`
 
 ---
 
-## ⚙️ How the System Works
+## 🔑 Key Files to Read First
 
-### Intents
-| Intent | What it does |
-|---|---|
-| `memo_only` | Draft credit memo only (default when unclear) |
-| `memo_plus_distribution` | Memo + investor suitability + distribution advisory |
-| `memo_plus_holdbook` | Memo + operations implementation plan |
-| `full_e2e` | Full pipeline — both distribution and holdbook paths |
+When resuming work, read these in order:
 
-### Audiences
+1. **`ABOUT_ME.md`** — This file. Start here.
+2. **`PROJECT_HANDOFF.md`** — Current state, architecture decisions, source of truth.
+3. **`SESSION_LOG.md`** — Recent session history, what changed, what was tested.
+4. **`HANDOFF_20260430.md`** — Detailed last-session handoff.
+5. **`README.md`** — System overview and quick-run examples.
+6. **`ROADMAP.md`** — Build phases and project folder structure.
+
+---
+
+## 🤖 Agent History
+
+| Agent | Role |
+|-------|------|
+| Claude (Anthropic) | Primary coding agent, architecture decisions |
+| Gemini CLI | Session work on supervisor logic, UI stabilization |
+| Codex (OpenAI) | Backend/UI hardening sessions |
+| Hermes (Nous Research) | My personal AI assistant via Telegram |
+
+---
+
+## 🧠 How I Like to Work
+
+### With AI agents:
+- **Prefer autonomous mode** — don't ask for confirmation on every step, just do it
+- **Always run tests** after changes (`pytest`) — I care about a clean test suite
+- **Write handoff notes** at the end of each session (`SESSION_LOG.md`)
+- **No cloud, no leaks** — all processing must stay local unless I explicitly say otherwise
+- **Keep existing tests passing** — never break the test suite without telling me
+
+### Communication style:
+- Be **direct and concise** — no fluff, no lengthy preambles
+- Use **bullet points** for steps and checklists
+- Show me **real output** — don't summarize tool results without showing evidence
+- If something is broken, say so clearly and propose a fix
+
+### Code preferences:
+- Python 3 (using `.venv` or `uv`)
+- Clean commits with descriptive messages
+- Tests before shipping features (or at minimum, don't break existing ones)
+- Markdown for all documentation
+
+---
+
+## 📊 Current System Status (as of last update)
+
+- **Backend:** FastAPI on `127.0.0.1:8000` ✅
+- **LM Studio:** `http://localhost:1234/v1` — model `qwen/qwen3.5-9b`
+- **Tests:** 39 passing ✅
+- **Autonomous inbox:** Configured ✅
+- **UI:** React frontend, MD output format as default ✅
+
+### Supported intents:
+- `memo_only` — credit memo only (default when unclear)
+- `memo_plus_distribution` — memo + investor suitability + distribution advisory
+- `memo_plus_holdbook` — memo + operations implementation plan
+- `full_e2e` — all paths, full sequence
+
+### Supported audience templates:
 - `credit_committee`
 - `ceo`
 - `chief_cibg`
 - `external_client`
 
-### Route Modes
-- `route_mode=full` — force full agent sequence
-- `route_mode=targeted` — run selected workers + auto-add dependencies
-- `route_mode=auto` — manager infers route from document or instruction text
-
-### Controller Rubric (Senior Advisor)
-Scoring dimensions (each 1–10):
-- Factual coherence
-- Legal consistency
-- Financial completeness
-- Audience-fit
-- Actionability
-
-Decision thresholds:
-- **APPROVE:** all dimensions ≥ 7, total ≥ 38
-- **REVISE:** all dimensions ≥ 5, total ≥ 28 (one revision pass only)
-- **ESCALATE_TO_HUMAN:** otherwise
-
-### Human Gate
-After memo generation, a gate decision is required:
-- `approve` — proceed to post-credit branching
-- `revise` — one controlled revision pass
-- `stop` — terminate cleanly, artifacts saved
-
-Use `--autonomous` flag to auto-approve and skip interactive prompts.
-
 ---
 
-## 🚀 Quick Start (for AI agents resuming work)
+## 🚀 How to Resume Work
 
 ```bash
-# 1. Check status
+# 1. Check backend status
 ./status_ui.command
 
-# 2. Start full stack if backend is down
+# 2. If backend is down, start the full stack
 ./open_full_stack.command
-# or
-./scripts/launch_local_full_stack.sh
 
-# 3. Verify LM Studio is running
+# 3. Confirm LM Studio is running
 curl http://localhost:1234/v1/models
 
-# 4. Run a sample memo
-python3 main.py --sample --intent memo_only --audience credit_committee --post-credit stop
+# 4. Run tests
+PYTHONPYCACHEPREFIX=/tmp/pycache ./.venv/bin/python -m pytest
 
-# 5. Run tests
-./.venv/bin/python -m pytest
+# 5. Open the UI
+./open_ui.command
 ```
 
 ---
 
-## 🤝 How I Like to Work with AI Agents
+## 📝 Notes for AI Assistants
 
-### Communication preferences
-- **Be direct and concise** — I don't need lengthy explanations, just actionable info
-- **Vietnamese is fine** for casual conversation, but keep code/logs/docs in English
-- **Give me status updates** when running long tasks — don't go silent for minutes
-- **Show diffs, not full files** when making code changes — easier to review
-
-### Development preferences
-- **Always run tests after changes** — `pytest` must stay green
-- **Preserve parallel execution logic** — don't refactor the core pipeline structure
-- **Use `--autonomous` flag** for non-interactive batch operations
-- **Default output format:** Markdown (MD)
-- **Default model:** `qwen/qwen3.5-9b` via LM Studio unless specified otherwise
-
-### Agent handoff protocol
-- At end of session: update `SESSION_LOG.md` with what changed, what was tested, what's next
-- Use `PROJECT_HANDOFF.md` as the master source of truth for cross-session state
-- Keep `CLAUDE.md` empty (reserved for Claude-specific rules if needed)
+- My username on Telegram is **Manh Cuong**
+- I interact with Hermes Agent via **Telegram DM**
+- When I say "the project", I mean **SF Agentic AI** unless I specify otherwise
+- When I say "push to GitHub", push to the `Michaeldao` repo (this one)
+- I may use different AI agents across sessions — read `SESSION_LOG.md` to see who did what
+- My PAT rotates — if auth fails, ask me for a new one
 
 ---
 
-## 📋 Session Log Index
-
-| Date | Agent | Key Changes |
-|---|---|---|
-| 2026-05-10 17:30 | Gemini CLI | Stabilized UI state, context-aware routing, MD default |
-| 2026-05-10 13:00 | Gemini CLI | Removed credit memo bias, fixed worker routing logic |
-| 2026-04-30 | Multiple | Local UI production hardening, blank memo fix, regression tests |
-
-See `SESSION_LOG.md` for full details.
-
----
-
-## 🔐 Security Notes
-
-- **All inference is local** — LM Studio at `http://localhost:1234/v1`
-- **No cloud LLM calls** in production mode (unless explicitly enabled with `--perplexity`)
-- **Backend is local only** — `127.0.0.1:8000`, not exposed externally
-- This repo is private. PAT and secrets are managed outside the repo.
-
----
-
-## 📌 Current Priorities (as of last session)
-
-1. **Settings UI/UX redesign** — complete before making more Settings changes
-2. **Multi-file SOP intent test** — visual confirmation that MD default persists
-3. **Google Drive inbox** — verify sync is stable in production
-4. **UI artifact preview** — download versioned artifacts without navigating many screens
-
----
-
-*Last updated: 2026-06-14 | Maintained by: Hermes Agent*
+*Last updated: 2026-06-14*

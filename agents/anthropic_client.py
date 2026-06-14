@@ -55,18 +55,18 @@ except ImportError:
 # Override any agent's model via env: e.g. ANTHROPIC_MODEL_INGESTION=claude-haiku-4
 AGENT_MODEL_MAP: dict[str, str] = {
     # Fast + cheap — pure structured extraction, no reasoning needed
-    "ingestion":          os.getenv("ANTHROPIC_MODEL_INGESTION",    "claude-haiku-4-20250514"),
-    "market_intel":       os.getenv("ANTHROPIC_MODEL_MARKET_INTEL", "claude-haiku-4-20250514"),
+    "ingestion":          os.getenv("ANTHROPIC_MODEL_INGESTION",    "claude-haiku-4-5-20251001"),
+    "market_intel":       os.getenv("ANTHROPIC_MODEL_MARKET_INTEL", "claude-haiku-4-5-20251001"),
 
     # Mid-tier — analysis, flagging, numerical narratives
-    "financial_modeler":  os.getenv("ANTHROPIC_MODEL_FINANCIAL",    "claude-sonnet-4-5"),
-    "compliance":         os.getenv("ANTHROPIC_MODEL_COMPLIANCE",   "claude-sonnet-4-5"),
-    "distribution_advisor": os.getenv("ANTHROPIC_MODEL_DISTRIBUTION", "claude-sonnet-4-5"),
-    "operations_planner": os.getenv("ANTHROPIC_MODEL_OPERATIONS",   "claude-sonnet-4-5"),
+    "financial_modeler":  os.getenv("ANTHROPIC_MODEL_FINANCIAL",    "claude-sonnet-4-5-20250929"),
+    "compliance":         os.getenv("ANTHROPIC_MODEL_COMPLIANCE",   "claude-sonnet-4-5-20250929"),
+    "distribution_advisor": os.getenv("ANTHROPIC_MODEL_DISTRIBUTION", "claude-sonnet-4-5-20250929"),
+    "operations_planner": os.getenv("ANTHROPIC_MODEL_OPERATIONS",   "claude-sonnet-4-5-20250929"),
 
     # Premium — final output and quality gate (must be flawless)
-    "memo_architect":     os.getenv("ANTHROPIC_MODEL_MEMO",         "claude-opus-4-5"),
-    "senior_advisor":     os.getenv("ANTHROPIC_MODEL_ADVISOR",      "claude-opus-4-5"),
+    "memo_architect":     os.getenv("ANTHROPIC_MODEL_MEMO",         "claude-sonnet-4-6"),
+    "senior_advisor":     os.getenv("ANTHROPIC_MODEL_ADVISOR",      "claude-sonnet-4-6"),
 }
 
 # Fallback model if agent not in map

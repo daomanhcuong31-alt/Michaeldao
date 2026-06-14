@@ -44,6 +44,17 @@ def preflight_lm_studio(base_url: str, model: str, timeout_sec: float = 5.0, pro
         "model_count": int
       }
     """
+    # Anthropic: no local server to check — API key validated at call time
+    if (provider or "").strip().lower() == "anthropic":
+        return {
+            "ok": True,
+            "models_url": "https://api.anthropic.com/v1/models",
+            "model_present": True,
+            "warning": "",
+            "error": "",
+            "model_count": 1,
+        }
+
     try:
         normalized = _normalize_base_url(base_url)
     except Exception as exc:
